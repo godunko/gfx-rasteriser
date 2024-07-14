@@ -18,8 +18,8 @@
 --
 --  4. 16bit binary precision fixed point type is used by rasterizer internally
 --  to avoid any floating point operations and floating point to integer
---  conversions on code paths critical for performance. Such precision allows to
---  minimize accumulated error for displays with about 32K resolution.
+--  conversions on code paths critical for performance. Such precision allows
+--  to minimize accumulated error for displays with about 32K resolution.
 --
 --  Relationship between these types is presented below.
 --
@@ -50,13 +50,14 @@
 --  Conversion between Device_Pixel_Coordinate and Device_Pixel_Index is
 --  straight forward, thanks to Ada's default floating to integer values
 --  conversion rules (rounding to nearest integer). Note, negative and positive
---  number are rounded in different directions. It is ignored by the algoriphms.
+--  number are rounded in different directions. It is ignored by the
+--  algoriphms.
 
 package GFX.Drawing
   with Pure
 is
 
-   subtype Device_Pixel_Coordinate is GFX.Real;
+   subtype Device_Pixel_Coordinate is GX_Real;
    --  Coordinate of the device's hardware pixel. Integral value corresponds to
    --  the center of the hardware pixel.
 
