@@ -26,6 +26,8 @@ is
 
    One : constant Fixed_16;
 
+   Fixed_16_Delta : constant := 1.0 / (2.0 ** 16);
+
    function To_Fixed_6
      (Item : GFX.Drawing.Device_Pixel_Coordinate) return Fixed_6;
    --  Convert given floating point value to binary fixed point value with 6

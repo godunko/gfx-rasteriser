@@ -330,9 +330,13 @@ package body GFX.Drawing.Primitive_Rasterizer is
             Internal_Fill_Rectangle
               (Top       => PA.Y,
                Left      => PA.X - HW,
-               Right     => PA.X + HW,
+               Right     => PA.X + HW - Fixed_16_Delta,
                Bottom    => PB.Y,
                Fill_Span => Fill_Span);
+            --  Fill rectangle is smaller by Fixed_16_Epsilon at right side
+            --  to prevent fill of the "empty" pixel due to use of the "round
+            --  to nearest" rounding mode for floating point to fixed point
+            --  conversion.
          end;
 
          return;
