@@ -9,8 +9,8 @@
 --
 --  They use GX_Integer as base type, which is 32bit on 32bit CPUs, thus enough
 --  to support displays with reasonable size for modern 32-bit MCUs. On 64bit
---  systems use of 64bit integer as base type enhance range of supported display
---  resolutions, and/or might improve performance.
+--  systems use of 64bit integer as base type enhance range of supported
+--  display resolutions, and/or might improve performance.
 
 pragma Restrictions (No_Elaboration_Code);
 
@@ -66,19 +66,20 @@ is
    --  Returns coverage of the pixel at the right side from the given value.
 
    function Integral (Item : Fixed_16) return GX_Integer;
-   --  Returns integral part of the given value (round toward zero, truncation).
+   --  Returns integral part of the given value (round toward zero,
+   --  truncation).
 
    function Multiply_Coverage
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
    --  Multiply two given fixed point values and return result rounded toward
    --  zero.
    --
-   --  This subprogram is intended to be used for multiplication of the coverage
-   --  values, thus arguments must be in 0.0 .. 1.0 range.
+   --  This subprogram is intended to be used for multiplication of the
+   --  coverage values, thus arguments must be in 0.0 .. 1.0 range.
 
    function To_Grayscale (Item : Fixed_16) return GFX.Drawing.Grayscale;
-   --  Converts given fixed point value in range 0.0 .. 1.0 into grayscale value
-   --  in range 0 .. 255.
+   --  Converts given fixed point value in range 0.0 .. 1.0 into grayscale
+   --  value in range 0 .. 255.
 
 private
 
