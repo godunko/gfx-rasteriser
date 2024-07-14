@@ -60,7 +60,7 @@ is
    --  Coordinate of the device's hardware pixel. Integral value corresponds to
    --  the center of the hardware pixel.
 
-   subtype Device_Pixel_Index is Interfaces.Integer_32;
+   subtype Device_Pixel_Index is GX_Integer;
    --  Index of the device's hardware pixel.
 
    subtype Device_Pixel_Count is Device_Pixel_Index

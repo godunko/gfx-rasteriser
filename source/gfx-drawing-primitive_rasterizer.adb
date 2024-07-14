@@ -92,32 +92,32 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Coverage : GFX.Drawing.Grayscale))
    is
       T  : constant Fixed_16   := To_Fixed_16 (Top);
-      TI : constant Integer_32 := Integral (T);
+      TI : constant GX_Integer := Integral (T);
       TC : constant Fixed_16   := Right_Coverage (T);
 
       L  : constant Fixed_16   := To_Fixed_16 (Left);
-      LI : constant Integer_32 := Integral (L);
+      LI : constant GX_Integer := Integral (L);
       LC : constant Fixed_16   := Right_Coverage (L);
 
       R  : constant Fixed_16   := To_Fixed_16 (Right);
-      RI : constant Integer_32 := Integral (R);
+      RI : constant GX_Integer := Integral (R);
       RC : constant Fixed_16   := Left_Coverage (R);
 
       B  : constant Fixed_16   := To_Fixed_16 (Bottom);
-      BI : constant Integer_32 := Integral (B);
+      BI : constant GX_Integer := Integral (B);
       BC : constant Fixed_16   := Left_Coverage (B);
 
       procedure Fill_1
-        (HW : Integer_32;
+        (HW : GFX.Drawing.Device_Pixel_Count;
          HC : Fixed_16);
       --  Fill each line by one span
 
       procedure Fill_2
-        (LI : Integer_32;
-         LW : Integer_32;
+        (LI : GFX.Drawing.Device_Pixel_Index;
+         LW : GFX.Drawing.Device_Pixel_Count;
          LC : Fixed_16;
-         RI : Integer_32;
-         RW : Integer_32;
+         RI : GFX.Drawing.Device_Pixel_Index;
+         RW : GFX.Drawing.Device_Pixel_Count;
          RC : Fixed_16);
       --  Fill each line by two spans
 
@@ -129,12 +129,12 @@ package body GFX.Drawing.Primitive_Rasterizer is
       ------------
 
       procedure Fill_1
-        (HW : Integer_32;
+        (HW : GFX.Drawing.Device_Pixel_Count;
          HC : Fixed_16)
       is
          HG : constant GFX.Drawing.Grayscale := To_Grayscale (HC);
          AC : Fixed_16;
-         Y  : Integer_32 := TI + 1;
+         Y  : GX_Integer := TI + 1;
 
       begin
          if TI = BI then
@@ -168,18 +168,18 @@ package body GFX.Drawing.Primitive_Rasterizer is
       ------------
 
       procedure Fill_2
-        (LI : Integer_32;
-         LW : Integer_32;
+        (LI : GFX.Drawing.Device_Pixel_Index;
+         LW : GFX.Drawing.Device_Pixel_Count;
          LC : Fixed_16;
-         RI : Integer_32;
-         RW : Integer_32;
+         RI : GFX.Drawing.Device_Pixel_Index;
+         RW : GFX.Drawing.Device_Pixel_Count;
          RC : Fixed_16)
       is
          HC : constant Fixed_16 := (TC + BC) - One;
          LG : constant GFX.Drawing.Grayscale := To_Grayscale (LC);
          RG : constant GFX.Drawing.Grayscale := To_Grayscale (RC);
 
-         Y  : Integer_32 := TI + 1;
+         Y  : GFX.Drawing.Device_Pixel_Index := TI + 1;
          SG : GFX.Drawing.Grayscale;
          EG : GFX.Drawing.Grayscale;
 
@@ -225,13 +225,13 @@ package body GFX.Drawing.Primitive_Rasterizer is
       ------------
 
       procedure Fill_3 is
-         HL : constant Integer_32 := RI - LI + 1 - 2;
-         LG : constant GFX.Drawing.Grayscale := To_Grayscale (LC);
-         CG : constant GFX.Drawing.Grayscale := To_Grayscale (One);
-         RG : constant GFX.Drawing.Grayscale := To_Grayscale (RC);
+         HL : constant GFX.Drawing.Device_Pixel_Count := RI - LI + 1 - 2;
+         LG : constant GFX.Drawing.Grayscale          := To_Grayscale (LC);
+         CG : constant GFX.Drawing.Grayscale          := To_Grayscale (One);
+         RG : constant GFX.Drawing.Grayscale          := To_Grayscale (RC);
 
          HC : Fixed_16;
-         Y  : Integer_32 := TI + 1;
+         Y  : GFX.Drawing.Device_Pixel_Count := TI + 1;
          SG : GFX.Drawing.Grayscale;
          MG : GFX.Drawing.Grayscale;
          EG : GFX.Drawing.Grayscale;

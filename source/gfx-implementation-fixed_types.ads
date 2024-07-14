@@ -7,22 +7,18 @@
 --  This package contains type declarations and operations for binary fixed
 --  point types with 6 and 16 bits of the precision used for rasterizing.
 --
---  They use Integer_32 as base type, which is enough to support displays with
---  reasonable size for modern 32-bit MCUs. On 64bit systems Integer_64 can be
---  used as base type to enhance range of supported display resolutions, and/or
---  improve performance.
+--  They use GX_Integer as base type, which is 32bit on 32bit CPUs, thus enough
+--  to support displays with reasonable size for modern 32-bit MCUs. On 64bit
+--  systems use of 64bit integer as base type enhance range of supported display
+--  resolutions, and/or might improve performance.
 
 pragma Restrictions (No_Elaboration_Code);
-
-with Interfaces;
 
 with GFX.Drawing;
 
 package GFX.Implementation.Fixed_Types
   with Pure
 is
-
-   subtype Integer is Interfaces.Integer_32;
 
    type Fixed_6 is private;
 
@@ -67,7 +63,7 @@ is
    function Right_Coverage (Item : Fixed_16) return Fixed_16;
    --  Returns coverage of the pixel at the right side from the given value.
 
-   function Integral (Item : Fixed_16) return Integer;
+   function Integral (Item : Fixed_16) return GX_Integer;
    --  Returns integral part of the given value (round toward zero, truncation).
 
    function Multiply_Coverage
@@ -84,19 +80,10 @@ is
 
 private
 
-   type Fixed_6 is new Interfaces.Integer_32;
+   type Fixed_6 is new GFX.GX_Integer;
 
-   type Fixed_16 is new Interfaces.Integer_32;
+   type Fixed_16 is new GFX.GX_Integer;
 
    One : constant Fixed_16 := 2**16;
-
-   subtype Unsigned is Interfaces.Unsigned_32;
-   pragma Assert (Unsigned'Size = Fixed_6'Size);
-   pragma Assert (Unsigned'Size = Fixed_16'Size);
-   --  Unsigned subtype to use for bit-wise operation.
-
-   pragma Assert (Integer'Size = Fixed_6'Size);
-   pragma Assert (Integer'Size = Fixed_16'Size);
-   --  Assert size of the Integer type.
 
 end GFX.Implementation.Fixed_Types;

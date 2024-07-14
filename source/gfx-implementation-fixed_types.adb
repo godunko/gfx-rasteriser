@@ -17,11 +17,11 @@ package body GFX.Implementation.Fixed_Types is
    Fixed_16_Offset : constant := -(2.0 ** 15);
 
    function To_Integer is
-     new Ada.Unchecked_Conversion (Unsigned, Integer);
+     new Ada.Unchecked_Conversion (GX_Unsigned, GX_Integer);
    function To_Unsigned is
-     new Ada.Unchecked_Conversion (Fixed_16, Unsigned);
+     new Ada.Unchecked_Conversion (Fixed_16, GX_Unsigned);
    function To_Fixed_16 is
-     new Ada.Unchecked_Conversion (Unsigned, Fixed_16);
+     new Ada.Unchecked_Conversion (GX_Unsigned, Fixed_16);
 
    ---------
    -- "+" --
@@ -81,7 +81,7 @@ package body GFX.Implementation.Fixed_Types is
    -- Integral --
    --------------
 
-   function Integral (Item : Fixed_16) return Interfaces.Integer_32 is
+   function Integral (Item : Fixed_16) return GX_Integer is
    begin
       return To_Integer (Shift_Right_Arithmetic (To_Unsigned (Item), 16));
    end Integral;
@@ -116,13 +116,13 @@ package body GFX.Implementation.Fixed_Types is
    function Multiply_Coverage
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16
    is
-      L  : constant Unsigned := To_Unsigned (Left);
-      LH : constant Unsigned := Shift_Right (L, 16);
-      LL : constant Unsigned := L and 16#FFFF#;
+      L  : constant GX_Unsigned := To_Unsigned (Left);
+      LH : constant GX_Unsigned := Shift_Right (L, 16);
+      LL : constant GX_Unsigned := L and 16#FFFF#;
 
-      R  : constant Unsigned := To_Unsigned (Right);
-      RH : constant Unsigned := Shift_Right (R, 16);
-      RL : constant Unsigned := R and 16#FFFF#;
+      R  : constant GX_Unsigned := To_Unsigned (Right);
+      RH : constant GX_Unsigned := Shift_Right (R, 16);
+      RL : constant GX_Unsigned := R and 16#FFFF#;
 
    begin
       return
