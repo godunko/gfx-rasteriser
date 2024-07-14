@@ -1,0 +1,22 @@
+name = "gfx_drawing"
+description = "Platform Independent Graphics Library Drawing"
+version = "0.1.0-dev"
+
+authors = ["Vadim Godunko"]
+maintainers = ["Vadim Godunko <vgodunko@gmail.com>"]
+maintainers-logins = ["godunko"]
+licenses = "Apache-2.0 WITH LLVM-exception"
+tags = ["graphics"]
+
+project-files = ["gnat/gfx_drawing.gpr"]
+
+[configuration]
+generate_ada = false
+generate_c = false
+generate_gpr = true
+
+[[depends-on]]
+gfx_core = "~0.1.0-dev"
+
+[[pins]]
+gfx_core = { path='../gfx-core' }
