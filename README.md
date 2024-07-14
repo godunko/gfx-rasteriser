@@ -9,4 +9,4 @@ Drawing Module of the library provides implementation of the rasterization stage
 ```
 to do next stage of the processing, like color scaling and blending.
 
-Use case of this module can be found in [GFX sandox](https://github.com/godunko/gfx-sandbox).
+Use case of this module can be found in [GFX sandbox](https://github.com/godunko/gfx-sandbox).
