@@ -27,7 +27,7 @@ is
                        Width    : GFX.Drawing.Device_Pixel_Count;
                        Coverage : GFX.Drawing.Grayscale);
 
-   procedure Draw_Line
+   procedure Rasterize_Line
      (Point_A   : GFX.Points.GF_Point;
       Point_B   : GFX.Points.GF_Point;
       Width     : GFX.Real;

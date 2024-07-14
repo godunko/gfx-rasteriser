@@ -16,66 +16,6 @@ package body GFX.Drawing.Primitive_Rasterizer is
    use GFX.Implementation.Fixed_Types;
    use GFX.Points;
 
-   ---------------
-   -- Draw_Line --
-   ---------------
-
-   procedure Draw_Line
-     (Point_A   : GFX.Points.GF_Point;
-      Point_B   : GFX.Points.GF_Point;
-      Width     : GFX.Real;
-      Fill_Span : not null access procedure
-        (X        : GFX.Drawing.Device_Pixel_Index;
-         Y        : GFX.Drawing.Device_Pixel_Index;
-         Width    : GFX.Drawing.Device_Pixel_Count;
-         Coverage : GFX.Drawing.Grayscale))
-      --  Draw_Span : not null Draw_Span_Subprogram)
-   is
-      pragma Suppress (All_Checks);
-
-      PA : GF_Point := Point_A;
-      PB : GF_Point := Point_B;
-      W  : Real     := Width;
-
-   begin
-      if Is_Equal_Fixed_6 (PA.Y, PB.Y) then
-         --  Line is horizontal, convert it to vertical.
-
-         declare
-            X  : constant Real := (PA.X + PB.X) / 2.0;
-            Y  : constant Real := PA.Y;
-            DY : constant Real := W / 2.0;
-            WX : constant Real := abs (PA.X - PB.X);
-
-         begin
-            W  := WX;
-            PA := (X, Y - DY);
-            PB := (X, Y + DY);
-         end;
-      end if;
-
-      if Is_Equal_Fixed_6 (PA.X, PB.X) then
-         --  Line is vertical (or horizontal converted to vertical), draw
-         --  rectangle.
-
-         declare
-            HW : constant Real := W / 2.0;
-
-         begin
-            Internal_Fill_Rectangle
-              (Top       => PA.Y,
-               Left      => PA.X - HW,
-               Right     => PA.X + HW,
-               Bottom    => PB.Y,
-               Fill_Span => Fill_Span);
-         end;
-
-         return;
-      end if;
-
-      raise Program_Error;
-   end Draw_Line;
-
    -----------------------------
    -- Internal_Fill_Rectangle --
    -----------------------------
@@ -329,5 +269,76 @@ package body GFX.Drawing.Primitive_Rasterizer is
          end if;
       end if;
    end Internal_Fill_Rectangle;
+
+   --------------------
+   -- Rasterize_Line --
+   --------------------
+
+   procedure Rasterize_Line
+     (Point_A   : GFX.Points.GF_Point;
+      Point_B   : GFX.Points.GF_Point;
+      Width     : GFX.Real;
+      Fill_Span : not null access procedure
+        (X        : GFX.Drawing.Device_Pixel_Index;
+         Y        : GFX.Drawing.Device_Pixel_Index;
+         Width    : GFX.Drawing.Device_Pixel_Count;
+         Coverage : GFX.Drawing.Grayscale))
+      --  Draw_Span : not null Draw_Span_Subprogram)
+   is
+      pragma Suppress (All_Checks);
+
+      PA : GF_Point := Point_A;
+      PB : GF_Point := Point_B;
+      W  : Real     := Width;
+
+   begin
+      if Is_Equal_Fixed_6 (PA.Y, PB.Y) then
+         --  Line is horizontal, convert it to vertical.
+
+         declare
+            X  : constant Real := (PA.X + PB.X) / 2.0;
+            Y  : constant Real := PA.Y;
+            DY : constant Real := W / 2.0;
+            WX : constant Real := abs (PA.X - PB.X);
+
+         begin
+            W  := WX;
+            PA := (X, Y - DY);
+            PB := (X, Y + DY);
+         end;
+      end if;
+
+      if PA.Y > PB.Y then
+         declare
+            Aux : GFX.Points.GF_Point;
+
+         begin
+            Aux := PA;
+            PA  := PB;
+            PB  := Aux;
+         end;
+      end if;
+
+      if Is_Equal_Fixed_6 (PA.X, PB.X) then
+         --  Line is vertical (or horizontal converted to vertical), draw
+         --  rectangle.
+
+         declare
+            HW : constant Real := W / 2.0;
+
+         begin
+            Internal_Fill_Rectangle
+              (Top       => PA.Y,
+               Left      => PA.X - HW,
+               Right     => PA.X + HW,
+               Bottom    => PB.Y,
+               Fill_Span => Fill_Span);
+         end;
+
+         return;
+      end if;
+
+      raise Program_Error;
+   end Rasterize_Line;
 
 end GFX.Drawing.Primitive_Rasterizer;
