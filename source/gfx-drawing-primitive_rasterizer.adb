@@ -279,7 +279,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
    procedure Rasterize_Line
      (Point_A   : GFX.Points.GF_Point;
       Point_B   : GFX.Points.GF_Point;
-      Width     : GFX.Real;
+      Width     : GFX.GX_Real;
       Fill_Span : not null access procedure
         (X        : GFX.Drawing.Device_Pixel_Index;
          Y        : GFX.Drawing.Device_Pixel_Index;
@@ -291,17 +291,17 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
       PA : GF_Point := Point_A;
       PB : GF_Point := Point_B;
-      W  : Real     := Width;
+      W  : GX_Real  := Width;
 
    begin
       if Is_Equal_Fixed_6 (PA.Y, PB.Y) then
          --  Line is horizontal, convert it to vertical.
 
          declare
-            X  : constant Real := (PA.X + PB.X) / 2.0;
-            Y  : constant Real := PA.Y;
-            DY : constant Real := W / 2.0;
-            WX : constant Real := abs (PA.X - PB.X);
+            X  : constant GX_Real := (PA.X + PB.X) / 2.0;
+            Y  : constant GX_Real := PA.Y;
+            DY : constant GX_Real := W / 2.0;
+            WX : constant GX_Real := abs (PA.X - PB.X);
 
          begin
             W  := WX;
@@ -326,7 +326,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
          --  rectangle.
 
          declare
-            HW : constant Real := W / 2.0;
+            HW : constant GX_Real := W / 2.0;
 
          begin
             Internal_Fill_Rectangle

@@ -30,7 +30,7 @@ is
    procedure Rasterize_Line
      (Point_A   : GFX.Points.GF_Point;
       Point_B   : GFX.Points.GF_Point;
-      Width     : GFX.Real;
+      Width     : GFX.GX_Real;
       Fill_Span : not null access procedure
         (X        : GFX.Drawing.Device_Pixel_Index;
          Y        : GFX.Drawing.Device_Pixel_Index;
