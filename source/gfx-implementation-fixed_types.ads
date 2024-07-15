@@ -33,9 +33,28 @@ is
    --  Convert given floating point value to binary fixed point value with 6
    --  bits of precision.
 
+   function "<" (Left : Fixed_16; Right : Fixed_16) return Boolean;
+
+   function ">" (Left : Fixed_16; Right : Fixed_16) return Boolean;
+
    function "+" (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
 
    function "-" (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
+
+   function "*" (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
+
+   function "/" (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
+   --  ??? Should it be better to use floating point? Implementation requires
+   --  integer type of GX_Integer'Size * 2 bits.
+
+   function Divide_Saturated
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
+   --  Divide Left by Right, return GX_Integer'First/GX_Integer'Last on
+   --  overflow.
+
+   function Min (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
+
+   function Max (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
 
    function Is_Equal_Fixed_6
      (Left  : GFX.Drawing.Device_Pixel_Coordinate;
@@ -50,6 +69,12 @@ is
      (Item : GFX.Drawing.Device_Pixel_Coordinate) return Fixed_16;
    --  Convert given floating point value to binary fixed point value with 16
    --  bits of precision with the coordinate system offset.
+   --
+   --  ??? Should it snap to subpixel grid first?
+
+   function To_Fixed_16 (Item : Fixed_6) return Fixed_16;
+   --  Convert given subpixel coordinate to binary fixed point value with
+   --  coordinate system offset.
 
    --  function Distance_From_Previous (Item : Fixed_16) return Fixed_16;
    --  --  Return distance from the previous integral value to the given value. When
@@ -68,6 +93,11 @@ is
    function Integral (Item : Fixed_16) return GX_Integer;
    --  Returns integral part of the given value (round toward zero,
    --  truncation).
+
+   function Fractional (Item : Fixed_16) return Fixed_16;
+   --  Returns fractional part of the fixed point number.
+   --
+   --  ??? Not a fractional part, it is distance from the left pixel boundary.
 
    function Multiply_Coverage
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16;

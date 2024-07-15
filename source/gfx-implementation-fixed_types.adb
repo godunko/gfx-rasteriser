@@ -12,9 +12,12 @@ package body GFX.Implementation.Fixed_Types is
 
    use Interfaces;
 
-   Fixed_6_Scale   : constant := 2.0 ** 6;
-   Fixed_16_Scale  : constant := 2.0 ** 16;
-   Fixed_16_Offset : constant := -(2.0 ** 15);
+   Fixed_6_Scale    : constant  := 2.0 ** 6;
+   Fixed_16_Scale   : constant  := 2.0 ** 16;
+   Fixed_16_Offset  : constant  := -(2.0 ** 15);
+   Fixed_6_16_Scale : constant  := 2 ** 10;
+   --  Scale to convert Fixed_6 to Fixed_16 values.
+   Fixed_6_16_Offset : constant := -(2 ** 15);
 
    function To_Integer is
      new Ada.Unchecked_Conversion (GX_Unsigned, GX_Integer);
@@ -22,6 +25,26 @@ package body GFX.Implementation.Fixed_Types is
      new Ada.Unchecked_Conversion (Fixed_16, GX_Unsigned);
    function To_Fixed_16 is
      new Ada.Unchecked_Conversion (GX_Unsigned, Fixed_16);
+
+   ---------
+   -- "<" --
+   ---------
+
+   overriding function "<"
+     (Left : Fixed_16; Right : Fixed_16) return Boolean is
+   begin
+      return GX_Integer (Left) < GX_Integer (Right);
+   end "<";
+
+   ---------
+   -- ">" --
+   ---------
+
+   overriding function ">"
+     (Left : Fixed_16; Right : Fixed_16) return Boolean is
+   begin
+      return GX_Integer (Left) > GX_Integer (Right);
+   end ">";
 
    ---------
    -- "+" --
@@ -42,6 +65,34 @@ package body GFX.Implementation.Fixed_Types is
    begin
       return Fixed_16 (Integer (Left) - Integer (Right));
    end "-";
+
+   ---------
+   -- "*" --
+   ---------
+
+   function "*" (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
+   begin
+      return Fixed_16
+        ((Interfaces.Integer_64 (Left) * Interfaces.Integer_64 (Right))
+            / (2 ** 16));
+   end "*";
+
+   ---------
+   -- "/" --
+   ---------
+
+   overriding function "/"
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16
+   is
+      pragma Assert (Fixed_16'Size * 2 <= Interfaces.Integer_64'Size);
+
+      L : constant Interfaces.Integer_64 :=
+        Interfaces.Integer_64 (Left) * (2 ** 16);
+      R : constant Interfaces.Integer_64 := Interfaces.Integer_64 (Right);
+
+   begin
+      return Fixed_16 (L / R);
+   end "/";
 
    ----------------------------
    -- Distance_From_Previous --
@@ -77,6 +128,58 @@ package body GFX.Implementation.Fixed_Types is
    --         ((2**16 - (To_Unsigned (Item) and 16#FFFF#)) and 16#FFFF#);
    --  end Distance_To_Next;
 
+   ----------------------
+   -- Divide_Saturated --
+   ----------------------
+
+   function Divide_Saturated
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16
+   is
+      pragma Assert (Fixed_16'Size * 2 <= Interfaces.Integer_64'Size);
+
+      L : constant Interfaces.Integer_64 :=
+        Interfaces.Integer_64 (Left) * (2 ** 16);
+      R : constant Interfaces.Integer_64 := Interfaces.Integer_64 (Right);
+      D : Interfaces.Integer_64;
+
+   begin
+      if Right = 0 then
+         if Left < 0 then
+            return Fixed_16 (GX_Integer'First);
+
+         else
+            return Fixed_16 (GX_Integer'Last);
+         end if;
+      end if;
+
+      D  := L / R;
+
+      if D < Interfaces.Integer_64 (GX_Integer'First) then
+         return Fixed_16 (GX_Integer'First);
+
+      elsif D > Interfaces.Integer_64 (GX_Integer'Last) then
+         return Fixed_16 (GX_Integer'Last);
+
+      else
+         return Fixed_16 (D);
+      end if;
+   end Divide_Saturated;
+
+   ----------------
+   -- Fractional --
+   ----------------
+
+   function Fractional (Item : Fixed_16) return Fixed_16 is
+   begin
+      --  if GX_Integer (Item) >= 0 then
+         return To_Fixed_16 (To_Unsigned (Item) and 16#FFFF#);
+      --
+      --  else
+      --     return
+      --       To_Fixed_16 ((To_Unsigned (Item) and 16#FFFF#) or 16#FFFF_0000#);
+      --  end if;
+   end Fractional;
+
    --------------
    -- Integral --
    --------------
@@ -108,6 +211,24 @@ package body GFX.Implementation.Fixed_Types is
    begin
       return To_Fixed_16 (To_Unsigned (Item) and 16#FFFF#) + 1;
    end Left_Coverage;
+
+   ---------
+   -- Max --
+   ---------
+
+   function Max (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
+   begin
+      return Fixed_16 (GX_Integer'Max (GX_Integer (Left), GX_Integer (Right)));
+   end Max;
+
+   ---------
+   -- Min --
+   ---------
+
+   function Min (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
+   begin
+      return Fixed_16 (GX_Integer'Min (GX_Integer (Left), GX_Integer (Right)));
+   end Min;
 
    -----------------------
    -- Multiply_Coverage --
@@ -157,6 +278,16 @@ package body GFX.Implementation.Fixed_Types is
      (Item : GFX.Drawing.Device_Pixel_Coordinate) return Fixed_16 is
    begin
       return Fixed_16 (Item * Fixed_16_Scale - Fixed_16_Offset);
+   end To_Fixed_16;
+
+   -----------------
+   -- To_Fixed_16 --
+   -----------------
+
+   function To_Fixed_16 (Item : Fixed_6) return Fixed_16 is
+   begin
+      return
+        Fixed_16 (GX_Integer (Item) * Fixed_6_16_Scale) - Fixed_6_16_Offset;
    end To_Fixed_16;
 
    ------------------
