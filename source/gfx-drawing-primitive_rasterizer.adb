@@ -9,12 +9,14 @@ pragma Restrictions (No_Elaboration_Code);
 pragma Ada_2022;
 
 with GFX.Implementation.Fixed_Types;
+with GFX.Vectors;
 
 package body GFX.Drawing.Primitive_Rasterizer is
 
    use Interfaces;
    use GFX.Implementation.Fixed_Types;
    use GFX.Points;
+   use GFX.Vectors;
 
    -----------------------------
    -- Internal_Fill_Rectangle --
@@ -342,7 +344,119 @@ package body GFX.Drawing.Primitive_Rasterizer is
          return;
       end if;
 
-      raise Program_Error;
+      declare
+         V  : constant GF_Vector := PB - PA;
+         N2 : constant GF_Vector := Normalize ((V.Y, -V.X)) * (Width / 2.0);
+         --  Normal vector of the line with half width length.
+
+         Top    : GF_Point;
+         Left   : GF_Point;
+         Right  : GF_Point;
+         Bottom : GF_Point;
+
+         Top_X    : Fixed_16  with Volatile;
+         Top_Y    : Fixed_16 with Volatile;
+         Left_X   : Fixed_16 with Volatile;
+         Left_Y   : Fixed_16 with Volatile;
+         Right_X  : Fixed_16 with Volatile;
+         Right_Y  : Fixed_16 with Volatile;
+         Bottom_X : Fixed_16 with Volatile;
+         Bottom_Y : Fixed_16 with Volatile;
+
+         Top_Left_Slope     : Fixed_16 with Volatile;
+         Top_Right_Slope    : Fixed_16 with Volatile;
+         Bottom_Left_Slope  : Fixed_16 with Volatile;
+         Bottom_Right_Slope : Fixed_16 with Volatile;
+
+         Left_Up    : Fixed_16 with Volatile;
+         Right_Up   : Fixed_16 with Volatile;
+         Left_Down  : Fixed_16 with Volatile;
+         Right_Down : Fixed_16 with Volatile;
+
+         L : Fixed_16;
+         R : Fixed_16;
+         DL : Fixed_16;
+         DR : Fixed_16;
+
+      begin
+         --  Compute vertcies of the rectangle to be rasterized.
+
+         if PA.X < PB.X then
+            Top    := PA + N2;
+            Left   := PA - N2;
+            Right  := PB + N2;
+            Bottom := PB - N2;
+
+         else
+            Top    := PA - N2;
+            Left   := PB - N2;
+            Right  := PA + N2;
+            Bottom := PB + N2;
+         end if;
+
+         --  Snap verticies to the subpixel grid and convert them to Fixed_16
+         --  representation.
+
+         Top_X    := To_Fixed_16 (To_Fixed_6 (Top.X));
+         Top_Y    := To_Fixed_16 (To_Fixed_6 (Top.Y));
+         Left_X   := To_Fixed_16 (To_Fixed_6 (Left.X));
+         Left_Y   := To_Fixed_16 (To_Fixed_6 (Left.Y));
+         Right_X  := To_Fixed_16 (To_Fixed_6 (Right.X));
+         Right_Y  := To_Fixed_16 (To_Fixed_6 (Right.Y));
+         Bottom_X := To_Fixed_16 (To_Fixed_6 (Bottom.X));
+         Bottom_Y := To_Fixed_16 (To_Fixed_6 (Bottom.Y));
+
+         --  Compute slope of the lines of edges of the rectangle.
+
+         Top_Left_Slope     := (Left_X - Top_X) / (Left_Y - Top_Y);
+         Top_Right_Slope    := (Right_X - Top_X) / (Right_Y - Top_Y);
+         Bottom_Left_Slope  := (Left_X - Bottom_X) / (Left_Y - Bottom_Y);
+         Bottom_Right_Slope := (Right_X - Bottom_X) / (Right_Y - Bottom_Y);
+
+         --  Select slopes of the line at left and line at right sides.
+
+         DL := Top_Left_Slope;
+         DR := Top_Right_Slope;
+
+         --  Compute intersection of the current left and right lines with up
+         --  and down edges of the device pixel.
+
+         Left_Up := Top_X - (Fractional (Top_Y)) * Top_Left_Slope;
+         Right_Up := Top_X - (Fractional (Top_Y)) * Top_Right_Slope;
+         Left_Down := Top_X + (One - Fractional (Top_Y)) * Top_Left_Slope;
+         Right_Down := Top_X + (One - Fractional (Top_Y)) * Top_Right_Slope;
+
+         for Y in Integral (Top_Y) .. Integral (Bottom_Y + One) loop
+            L := Min (Left_Up, Left_Down);
+            R := Max (Right_Up, Right_Down);
+
+            Fill_Span (Integral (L), Y, Integral (R) - Integral (L) + 1, 255);
+
+            Left_Up  := Left_Down;
+            Right_Up := Right_Down;
+
+            if Y = Integral (Left_Y) then
+               --  Pixel of the left vertex has bean reached, switch direction
+               --  of the left line to the bottom vertex.
+
+               DL        := Bottom_Left_Slope;
+               Left_Down :=
+                 Left_X - (One - Fractional (Left_Y)) * Bottom_Left_Slope;
+            end if;
+
+            if Y = Integral (Right_Y) then
+               --  Pixel of the right vertex has bean reached, switch direction
+               --  of the left line to the bottom vertex.
+
+               DR         := Bottom_Right_Slope;
+               Right_Down :=
+                 Right_X - (One - Fractional (Right_Y)) * Bottom_Right_Slope;
+            end if;
+
+            Left_Down  := @ + DL;
+            Right_Down := @ + DR;
+         end loop;
+      end;
    end Rasterize_Line;
 
 end GFX.Drawing.Primitive_Rasterizer;
