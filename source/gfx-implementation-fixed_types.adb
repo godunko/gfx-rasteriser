@@ -72,9 +72,9 @@ package body GFX.Implementation.Fixed_Types is
 
    function "*" (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
    begin
-      return Fixed_16
-        ((Interfaces.Integer_64 (Left) * Interfaces.Integer_64 (Right))
-            / (2 ** 16));
+      return
+        Fixed_16
+          ((GX_Integer_2 (Left) * GX_Integer_2 (Right)) / (2 ** 16));
    end "*";
 
    ---------
@@ -84,11 +84,8 @@ package body GFX.Implementation.Fixed_Types is
    overriding function "/"
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16
    is
-      pragma Assert (Fixed_16'Size * 2 <= Interfaces.Integer_64'Size);
-
-      L : constant Interfaces.Integer_64 :=
-        Interfaces.Integer_64 (Left) * (2 ** 16);
-      R : constant Interfaces.Integer_64 := Interfaces.Integer_64 (Right);
+      L : constant GX_Integer_2 := GX_Integer_2 (Left) * (2 ** 16);
+      R : constant GX_Integer_2 := GX_Integer_2 (Right);
 
    begin
       return Fixed_16 (L / R);
@@ -135,12 +132,9 @@ package body GFX.Implementation.Fixed_Types is
    function Divide_Saturated
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16
    is
-      pragma Assert (Fixed_16'Size * 2 <= Interfaces.Integer_64'Size);
-
-      L : constant Interfaces.Integer_64 :=
-        Interfaces.Integer_64 (Left) * (2 ** 16);
-      R : constant Interfaces.Integer_64 := Interfaces.Integer_64 (Right);
-      D : Interfaces.Integer_64;
+      L : constant GX_Integer_2 := GX_Integer_2 (Left) * (2 ** 16);
+      R : constant GX_Integer_2 := GX_Integer_2 (Right);
+      D : GX_Integer_2;
 
    begin
       if Right = 0 then
@@ -154,10 +148,10 @@ package body GFX.Implementation.Fixed_Types is
 
       D  := L / R;
 
-      if D < Interfaces.Integer_64 (GX_Integer'First) then
+      if D < GX_Integer_2 (GX_Integer'First) then
          return Fixed_16 (GX_Integer'First);
 
-      elsif D > Interfaces.Integer_64 (GX_Integer'Last) then
+      elsif D > GX_Integer_2 (GX_Integer'Last) then
          return Fixed_16 (GX_Integer'Last);
 
       else
