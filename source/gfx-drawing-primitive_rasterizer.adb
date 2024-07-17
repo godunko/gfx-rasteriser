@@ -427,8 +427,12 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Right_Down := Top_X + (One - Fractional (Top_Y)) * Top_Right_Slope;
 
          for Y in Integral (Top_Y) .. Integral (Bottom_Y + One) loop
-            L := Min (Left_Up, Left_Down);
-            R := Max (Right_Up, Right_Down);
+            --  Limit horizontal span by the line's left and right edges
+            --  intersection with pixel's top and bottom edges, and clip by
+            --  horizontal position of the left and right vertices.
+
+            L := Max (Left_X, Min (Left_Up, Left_Down));
+            R := Min (Right_X, Max (Right_Up, Right_Down));
 
             Fill_Span (Integral (L), Y, Integral (R) - Integral (L) + 1, 255);
 
