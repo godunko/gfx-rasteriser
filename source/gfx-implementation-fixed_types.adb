@@ -36,6 +36,16 @@ package body GFX.Implementation.Fixed_Types is
       return GX_Integer (Left) < GX_Integer (Right);
    end "<";
 
+   ----------
+   -- "<=" --
+   ----------
+
+   overriding function "<="
+     (Left : Fixed_16; Right : Fixed_16) return Boolean is
+   begin
+      return GX_Integer (Left) <= GX_Integer (Right);
+   end "<=";
+
    ---------
    -- ">" --
    ---------
@@ -90,6 +100,15 @@ package body GFX.Implementation.Fixed_Types is
    begin
       return Fixed_16 (L / R);
    end "/";
+
+   -------------------------
+   -- Ceiling_Minus_Delta --
+   -------------------------
+
+   function Ceiling_Minus_Delta (Item : Fixed_16) return Fixed_16 is
+   begin
+      return Fixed_16 (To_Unsigned (Item) or 16#FFFF#);
+   end Ceiling_Minus_Delta;
 
    ----------------------------
    -- Distance_From_Previous --

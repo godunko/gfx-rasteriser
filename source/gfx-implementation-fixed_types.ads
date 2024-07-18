@@ -35,6 +35,8 @@ is
 
    function "<" (Left : Fixed_16; Right : Fixed_16) return Boolean;
 
+   function "<=" (Left : Fixed_16; Right : Fixed_16) return Boolean;
+
    function ">" (Left : Fixed_16; Right : Fixed_16) return Boolean;
 
    function "+" (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
@@ -100,6 +102,8 @@ is
    --  ??? Not a fractional part, it is distance from the left pixel boundary.
 
    function Floor (Item : Fixed_16) return Fixed_16;
+
+   function Ceiling_Minus_Delta (Item : Fixed_16) return Fixed_16;
 
    function Multiply_Coverage
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
