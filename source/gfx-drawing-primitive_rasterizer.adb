@@ -289,6 +289,35 @@ package body GFX.Drawing.Primitive_Rasterizer is
    is
       pragma Suppress (All_Checks);
 
+      procedure Compute_Slope
+        (From_X  : Fixed_16;
+         From_Y  : Fixed_16;
+         To_X    : Fixed_16;
+         To_Y    : Fixed_16;
+         Slope_X : out Fixed_16;
+         Slope_Y : out Fixed_16);
+      --  Compute slopes for X and Y directions of the given vector.
+
+      -------------------
+      -- Compute_Slope --
+      -------------------
+
+      procedure Compute_Slope
+        (From_X  : Fixed_16;
+         From_Y  : Fixed_16;
+         To_X    : Fixed_16;
+         To_Y    : Fixed_16;
+         Slope_X : out Fixed_16;
+         Slope_Y : out Fixed_16)
+      is
+         DX : constant Fixed_16 := To_X - From_X;
+         DY : constant Fixed_16 := To_Y - From_Y;
+
+      begin
+         Slope_X := Divide_Saturated (DX, DY);
+         Slope_Y := Divide_Saturated (DY, DX);
+      end Compute_Slope;
+
       PA : GF_Point := Point_A;
       PB : GF_Point := Point_B;
       W  : GX_Real  := Width;
@@ -366,9 +395,13 @@ package body GFX.Drawing.Primitive_Rasterizer is
          --  Coordinates of the drawn rectangle's verticies in fixed point.
 
          Top_Left_Slope_X     : Fixed_16 with Volatile;
+         Top_Left_Slope_Y     : Fixed_16 with Volatile;
          Top_Right_Slope_X    : Fixed_16 with Volatile;
+         Top_Right_Slope_Y    : Fixed_16 with Volatile;
          Bottom_Left_Slope_X  : Fixed_16 with Volatile;
+         Bottom_Left_Slope_Y  : Fixed_16 with Volatile;
          Bottom_Right_Slope_X : Fixed_16 with Volatile;
+         Bottom_Right_Slope_Y : Fixed_16 with Volatile;
          --  Slopes of the edge lines of the drawn rectangle in fixed point.
 
          Left_Edge_Row_Up     : Fixed_16 with Volatile;
@@ -418,20 +451,34 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
          --  Compute slope of the lines of edges of the rectangle.
 
-         Top_Left_Slope_X     :=
-           Divide_Saturated
-             (Left_Vertex_X - Top_Vertex_X, Left_Vertex_Y - Top_Vertex_Y);
-         Top_Right_Slope_X    :=
-           Divide_Saturated
-             (Right_Vertex_X - Top_Vertex_X, Right_Vertex_Y - Top_Vertex_Y);
-         Bottom_Left_Slope_X  :=
-           Divide_Saturated
-             (Left_Vertex_X - Bottom_Vertex_X,
-              Left_Vertex_Y - Bottom_Vertex_Y);
-         Bottom_Right_Slope_X :=
-           Divide_Saturated
-             (Right_Vertex_X - Bottom_Vertex_X,
-              Right_Vertex_Y - Bottom_Vertex_Y);
+         Compute_Slope
+           (From_X  => Top_Vertex_X,
+            From_Y  => Top_Vertex_Y,
+            To_X    => Left_Vertex_X,
+            To_Y    => Left_Vertex_Y,
+            Slope_X => Top_Left_Slope_X,
+            Slope_Y => Top_Left_Slope_Y);
+         Compute_Slope
+           (From_X  => Top_Vertex_X,
+            From_Y  => Top_Vertex_Y,
+            To_X    => Right_Vertex_X,
+            To_Y    => Right_Vertex_Y,
+            Slope_X => Top_Right_Slope_X,
+            Slope_Y => Top_Right_Slope_Y);
+         Compute_Slope
+           (From_X  => Bottom_Vertex_X,
+            From_Y  => Bottom_Vertex_Y,
+            To_X    => Left_Vertex_X,
+            To_Y    => Left_Vertex_Y,
+            Slope_X => Bottom_Left_Slope_X,
+            Slope_Y => Bottom_Left_Slope_Y);
+         Compute_Slope
+           (From_X  => Bottom_Vertex_X,
+            From_Y  => Bottom_Vertex_Y,
+            To_X    => Right_Vertex_X,
+            To_Y    => Right_Vertex_Y,
+            Slope_X => Bottom_Right_Slope_X,
+            Slope_Y => Bottom_Right_Slope_Y);
 
          --  Select slopes of the line at left and line at right sides.
 
