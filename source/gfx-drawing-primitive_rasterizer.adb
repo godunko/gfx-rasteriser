@@ -448,6 +448,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
                --  of the left line to the bottom vertex.
 
                DL        := Bottom_Left_Slope;
+               Left_Up   := Left_X + Fractional (Left_Y) * Bottom_Left_Slope;
                Left_Down :=
                  Left_X - (One - Fractional (Left_Y)) * Bottom_Left_Slope;
             end if;
@@ -457,6 +458,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
                --  of the left line to the bottom vertex.
 
                DR         := Bottom_Right_Slope;
+               Right_Up := Right_X + Fractional (Right_Y) * Bottom_Right_Slope;
                Right_Down :=
                  Right_X - (One - Fractional (Right_Y)) * Bottom_Right_Slope;
             end if;
