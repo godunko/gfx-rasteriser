@@ -378,6 +378,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
          DL : Fixed_16;
          DR : Fixed_16;
 
+         Y : Device_Pixel_Index;
+
       begin
          --  Compute vertcies of the rectangle to be rasterized.
 
@@ -430,7 +432,9 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Left_Down := Top_X + (One - Fractional (Top_Y)) * Top_Left_Slope;
          Right_Down := Top_X + (One - Fractional (Top_Y)) * Top_Right_Slope;
 
-         for Y in Integral (Top_Y) .. Integral (Bottom_Y + One) loop
+         Y := Integral (Top_Y);
+
+         loop
             --  Limit horizontal span by the line's left and right edges
             --  intersection with pixel's top and bottom edges, and clip by
             --  horizontal position of the left and right vertices.
@@ -463,6 +467,9 @@ package body GFX.Drawing.Primitive_Rasterizer is
                  Right_X - (One - Fractional (Right_Y)) * Bottom_Right_Slope;
             end if;
 
+            exit when Y = Integral (Bottom_Y + One);
+
+            Y          := @ + 1;
             Left_Down  := @ + DL;
             Right_Down := @ + DR;
          end loop;
