@@ -385,8 +385,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
          DL : Fixed_16;
          DR : Fixed_16;
 
-         X       : Device_Pixel_Index;
-         Row_Top : Fixed_16;
+         Row_Top    : Fixed_16;
+         Pixel_Left : Fixed_16;
 
       begin
          --  Compute vertcies of the rectangle to be rasterized.
@@ -476,21 +476,25 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
             --  Do rasterization
 
-            X := Integral (LS);
+            Pixel_Left := Floor (LS);
 
-            while X <= Integral (LE) loop
-               Fill_Span (X, Integral (Row_Top), 1, 64);
-               X := @ + 1;
+            while Pixel_Left <= Ceiling_Minus_Delta (LE) loop
+               Fill_Span (Integral (Pixel_Left), Integral (Row_Top), 1, 64);
+               Pixel_Left := @ + One;
             end loop;
 
-            if X < Integral (RS) then
-               Fill_Span (X, Integral (Row_Top), Integral (RS) - X, 255);
-               X := Integral (RS);
+            if Pixel_Left < Floor (RS) then
+               Fill_Span
+                 (Integral (Pixel_Left),
+                  Integral (Row_Top),
+                  Integral (RS) - Integral (Pixel_Left),
+                  255);
+               Pixel_Left := Floor (RS);
             end if;
 
-            while X <= Integral (RE) loop
-               Fill_Span (X, Integral (Row_Top), 1, 128);
-               X := @ + 1;
+            while Pixel_Left <= Ceiling_Minus_Delta (RE) loop
+               Fill_Span (Integral (Pixel_Left), Integral (Row_Top), 1, 128);
+               Pixel_Left := @ + One;
             end loop;
 
             Left_Edge_Row_Up  := Left_Edge_Row_Down;
