@@ -415,8 +415,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
          LE : Fixed_16 with Volatile;
          RS : Fixed_16 with Volatile;
          RE : Fixed_16 with Volatile;
-         DL : Fixed_16;
-         DR : Fixed_16;
+         Left_Slope_X  : Fixed_16;
+         Left_Slope_Y  : Fixed_16;
+         Right_Slope_X : Fixed_16;
+         Right_Slope_Y : Fixed_16;
 
          Row_Top    : Fixed_16;
          Pixel_Left : Fixed_16;
@@ -482,8 +484,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
          --  Select slopes of the line at left and line at right sides.
 
-         DL := Top_Left_Slope_X;
-         DR := Top_Right_Slope_X;
+         Left_Slope_X  := Top_Left_Slope_X;
+         Left_Slope_Y  := Top_Left_Slope_Y;
+         Right_Slope_X := Top_Right_Slope_X;
+         Right_Slope_Y := Top_Right_Slope_Y;
 
          --  Compute intersection of the current left and right lines with up
          --  and down edges of the device pixel.
@@ -544,6 +548,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
                Pixel_Left := @ + One;
             end loop;
 
+            exit when Row_Top = Floor (Bottom_Vertex_Y + One);
+
+            --  Compute data for the next iteration
+
             Left_Edge_Row_Up  := Left_Edge_Row_Down;
             Right_Edge_Row_Up := Right_Edge_Row_Down;
 
@@ -551,33 +559,27 @@ package body GFX.Drawing.Primitive_Rasterizer is
                --  Pixel of the left vertex has bean reached, switch direction
                --  of the left line to the bottom vertex.
 
-               DL                 := Bottom_Left_Slope_X;
+               Left_Slope_X       := Bottom_Left_Slope_X;
+               Left_Slope_Y       := Bottom_Left_Slope_Y;
                Left_Edge_Row_Up   :=
-                 Left_Vertex_X
-                   + Fractional (Left_Vertex_Y) * Bottom_Left_Slope_X;
-               Left_Edge_Row_Down :=
-                 Left_Vertex_X
-                   - (One - Fractional (Left_Vertex_Y)) * Bottom_Left_Slope_X;
+                 Left_Vertex_X + Fractional (Left_Vertex_Y) * Left_Slope_X;
+               Left_Edge_Row_Down := Left_Edge_Row_Up;
             end if;
 
             if Row_Top = Floor (Right_Vertex_Y) then
                --  Pixel of the right vertex has bean reached, switch direction
                --  of the left line to the bottom vertex.
 
-               DR                  := Bottom_Right_Slope_X;
+               Right_Slope_X       := Bottom_Right_Slope_X;
+               Right_Slope_Y       := Bottom_Right_Slope_Y;
                Right_Edge_Row_Up   :=
-                 Right_Vertex_X
-                   + Fractional (Right_Vertex_Y) * Bottom_Right_Slope_X;
-               Right_Edge_Row_Down :=
-                 Right_Vertex_X
-                   - (One - Fractional (Right_Vertex_Y)) * Bottom_Right_Slope_X;
+                 Right_Vertex_X + Fractional (Right_Vertex_Y) * Right_Slope_X;
+               Right_Edge_Row_Down := Right_Edge_Row_Up;
             end if;
 
-            exit when Row_Top = Floor (Bottom_Vertex_Y + One);
-
             Row_Top             := @ + One;
-            Left_Edge_Row_Down  := @ + DL;
-            Right_Edge_Row_Down := @ + DR;
+            Left_Edge_Row_Down  := @ + Left_Slope_X;
+            Right_Edge_Row_Down := @ + Right_Slope_X;
          end loop;
       end;
    end Rasterize_Line;
