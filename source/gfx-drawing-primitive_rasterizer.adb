@@ -408,10 +408,14 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
          --  Compute slope of the lines of edges of the rectangle.
 
-         Top_Left_Slope     := (Left_X - Top_X) / (Left_Y - Top_Y);
-         Top_Right_Slope    := (Right_X - Top_X) / (Right_Y - Top_Y);
-         Bottom_Left_Slope  := (Left_X - Bottom_X) / (Left_Y - Bottom_Y);
-         Bottom_Right_Slope := (Right_X - Bottom_X) / (Right_Y - Bottom_Y);
+         Top_Left_Slope     :=
+           Divide_Saturated (Left_X - Top_X, Left_Y - Top_Y);
+         Top_Right_Slope    :=
+           Divide_Saturated (Right_X - Top_X, Right_Y - Top_Y);
+         Bottom_Left_Slope  :=
+           Divide_Saturated (Left_X - Bottom_X, Left_Y - Bottom_Y);
+         Bottom_Right_Slope :=
+           Divide_Saturated (Right_X - Bottom_X, Right_Y - Bottom_Y);
 
          --  Select slopes of the line at left and line at right sides.
 
