@@ -45,9 +45,13 @@ is
 
    function "*" (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
 
+   function "*" (Left : GX_Integer; Right : Fixed_16) return Fixed_16;
+
    function "/" (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
    --  ??? Should it be better to use floating point? Implementation requires
    --  integer type of GX_Integer'Size * 2 bits.
+
+   function "/" (Left : Fixed_16; Right : GX_Integer) return Fixed_16;
 
    function Divide_Saturated
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16;

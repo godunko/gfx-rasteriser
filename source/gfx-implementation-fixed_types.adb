@@ -15,7 +15,7 @@ package body GFX.Implementation.Fixed_Types is
    Fixed_6_Scale    : constant  := 2.0 ** 6;
    Fixed_16_Scale   : constant  := 2.0 ** 16;
    Fixed_16_Offset  : constant  := -(2.0 ** 15);
-   Fixed_6_16_Scale : constant  := 2 ** 10;
+   Fixed_6_16_Scale : constant GX_Integer := 2 ** 10;
    --  Scale to convert Fixed_6 to Fixed_16 values.
    Fixed_6_16_Offset : constant := -(2 ** 15);
 
@@ -80,11 +80,21 @@ package body GFX.Implementation.Fixed_Types is
    -- "*" --
    ---------
 
-   function "*" (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
+   overriding function "*"
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
    begin
       return
         Fixed_16
           ((GX_Integer_2 (Left) * GX_Integer_2 (Right)) / (2 ** 16));
+   end "*";
+
+   ---------
+   -- "*" --
+   ---------
+
+   function "*" (Left : GX_Integer; Right : Fixed_16) return Fixed_16 is
+   begin
+      return Fixed_16 (GX_Integer_2 (Left) * GX_Integer_2 (Right));
    end "*";
 
    ---------
@@ -99,6 +109,15 @@ package body GFX.Implementation.Fixed_Types is
 
    begin
       return Fixed_16 (L / R);
+   end "/";
+
+   ---------
+   -- "/" --
+   ---------
+
+   function "/" (Left : Fixed_16; Right : GX_Integer) return Fixed_16 is
+   begin
+      return Fixed_16 (GX_Integer (Left) / Right);
    end "/";
 
    -------------------------
