@@ -56,6 +56,16 @@ package body GFX.Implementation.Fixed_Types is
       return GX_Integer (Left) > GX_Integer (Right);
    end ">";
 
+   ----------
+   -- ">=" --
+   ----------
+
+   overriding function ">="
+     (Left : Fixed_16; Right : Fixed_16) return Boolean is
+   begin
+      return GX_Integer (Left) >= GX_Integer (Right);
+   end ">=";
+
    ---------
    -- "+" --
    ---------
