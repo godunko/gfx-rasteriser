@@ -378,11 +378,14 @@ package body GFX.Drawing.Primitive_Rasterizer is
          --  X coordinate of the intersection of the edge line of the draw
          --  rectangle with the current rasterline.
 
-         L : Fixed_16;
-         R : Fixed_16;
+         LS : Fixed_16 with Volatile;
+         LE : Fixed_16 with Volatile;
+         RS : Fixed_16 with Volatile;
+         RE : Fixed_16 with Volatile;
          DL : Fixed_16;
          DR : Fixed_16;
 
+         X : Device_Pixel_Index;
          Y : Device_Pixel_Index;
 
       begin
@@ -450,17 +453,45 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Y := Integral (Top_Vertex_Y);
 
          loop
-            --  Limit horizontal span by the line's left and right edges
-            --  intersection with pixel's top and bottom edges, and clip by
-            --  horizontal position of the left and right vertices.
+            --  Rasterline's span is divided into up to three segments:
+            --   - intersection with the left edge line
+            --   - span of the solid area
+            --   - intersection with the right edge line
+            --
+            --  Spans of the intersection can overlap, in such case there is no
+            --  solid area between them.
+            --
+            --  Span of the intersection with the line edge on verticies'
+            --  rasterline might be wider than drawn rectangle, so clip them.
 
-            L :=
-              Max (Left_Vertex_X, Min (Left_Edge_Row_Up, Left_Edge_Row_Down));
-            R :=
-              Min
-                (Right_Vertex_X, Max (Right_Edge_Row_Up, Right_Edge_Row_Down));
+            LS := Min (Left_Edge_Row_Up, Left_Edge_Row_Down);
+            LE := Max (Left_Edge_Row_Up, Left_Edge_Row_Down);
+            RS := Min (Right_Edge_Row_Up, Right_Edge_Row_Down);
+            RE := Max (Right_Edge_Row_Up, Right_Edge_Row_Down);
 
-            Fill_Span (Integral (L), Y, Integral (R) - Integral (L) + 1, 255);
+            LS := Max (Left_Vertex_X, LS);
+            RE := Min (Right_Vertex_X, RE);
+            LE := Min (RE, LE);
+            RS := Max (LS, RS);
+
+            --  Do rasterization
+
+            X := Integral (LS);
+
+            while X <= Integral (LE) loop
+               Fill_Span (X, Y, 1, 64);
+               X := @ + 1;
+            end loop;
+
+            if X < Integral (RS) then
+               Fill_Span (X, Y, Integral (RS) - X, 255);
+               X := Integral (RS);
+            end if;
+
+            while X <= Integral (RE) loop
+               Fill_Span (X, Y, 1, 128);
+               X := @ + 1;
+            end loop;
 
             Left_Edge_Row_Up  := Left_Edge_Row_Down;
             Right_Edge_Row_Up := Right_Edge_Row_Down;
