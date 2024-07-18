@@ -33,6 +33,8 @@ is
    --  Convert given floating point value to binary fixed point value with 6
    --  bits of precision.
 
+   function "-" (Right : Fixed_16) return Fixed_16;
+
    function "<" (Left : Fixed_16; Right : Fixed_16) return Boolean;
 
    function "<=" (Left : Fixed_16; Right : Fixed_16) return Boolean;

@@ -80,6 +80,15 @@ package body GFX.Implementation.Fixed_Types is
    -- "-" --
    ---------
 
+   function "-" (Right : Fixed_16) return Fixed_16 is
+   begin
+      return Fixed_16 (-GX_Integer (Right));
+   end "-";
+
+   ---------
+   -- "-" --
+   ---------
+
    overriding function "-"
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
    begin
