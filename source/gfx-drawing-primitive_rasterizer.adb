@@ -349,29 +349,34 @@ package body GFX.Drawing.Primitive_Rasterizer is
          N2 : constant GF_Vector := Normalize ((V.Y, -V.X)) * (Width / 2.0);
          --  Normal vector of the line with half width length.
 
-         Top    : GF_Point;
-         Left   : GF_Point;
-         Right  : GF_Point;
-         Bottom : GF_Point;
+         Top_Vertex           : GF_Point;
+         Left_Vertex          : GF_Point;
+         Right_Vertex         : GF_Point;
+         Bottom_Vertex        : GF_Point;
+         --  Verticies of the drawn rectangle
 
-         Top_X    : Fixed_16  with Volatile;
-         Top_Y    : Fixed_16 with Volatile;
-         Left_X   : Fixed_16 with Volatile;
-         Left_Y   : Fixed_16 with Volatile;
-         Right_X  : Fixed_16 with Volatile;
-         Right_Y  : Fixed_16 with Volatile;
-         Bottom_X : Fixed_16 with Volatile;
-         Bottom_Y : Fixed_16 with Volatile;
+         Top_Vertex_X         : Fixed_16 with Volatile;
+         Top_Vertex_Y         : Fixed_16 with Volatile;
+         Left_Vertex_X        : Fixed_16 with Volatile;
+         Left_Vertex_Y        : Fixed_16 with Volatile;
+         Right_Vertex_X       : Fixed_16 with Volatile;
+         Right_Vertex_Y       : Fixed_16 with Volatile;
+         Bottom_Vertex_X      : Fixed_16 with Volatile;
+         Bottom_Vertex_Y      : Fixed_16 with Volatile;
+         --  Coordinates of the drawn rectangle's verticies in fixed point.
 
-         Top_Left_Slope     : Fixed_16 with Volatile;
-         Top_Right_Slope    : Fixed_16 with Volatile;
-         Bottom_Left_Slope  : Fixed_16 with Volatile;
-         Bottom_Right_Slope : Fixed_16 with Volatile;
+         Top_Left_Slope_X     : Fixed_16 with Volatile;
+         Top_Right_Slope_X    : Fixed_16 with Volatile;
+         Bottom_Left_Slope_X  : Fixed_16 with Volatile;
+         Bottom_Right_Slope_X : Fixed_16 with Volatile;
+         --  Slopes of the edge lines of the drawn rectangle in fixed point.
 
-         Left_Up    : Fixed_16 with Volatile;
-         Right_Up   : Fixed_16 with Volatile;
-         Left_Down  : Fixed_16 with Volatile;
-         Right_Down : Fixed_16 with Volatile;
+         Left_Edge_Row_Up     : Fixed_16 with Volatile;
+         Right_Edge_Row_Up    : Fixed_16 with Volatile;
+         Left_Edge_Row_Down   : Fixed_16 with Volatile;
+         Right_Edge_Row_Down  : Fixed_16 with Volatile;
+         --  X coordinate of the intersection of the edge line of the draw
+         --  rectangle with the current rasterline.
 
          L : Fixed_16;
          R : Fixed_16;
@@ -384,94 +389,113 @@ package body GFX.Drawing.Primitive_Rasterizer is
          --  Compute vertcies of the rectangle to be rasterized.
 
          if PA.X < PB.X then
-            Top    := PA + N2;
-            Left   := PA - N2;
-            Right  := PB + N2;
-            Bottom := PB - N2;
+            Top_Vertex    := PA + N2;
+            Left_Vertex   := PA - N2;
+            Right_Vertex  := PB + N2;
+            Bottom_Vertex := PB - N2;
 
          else
-            Top    := PA - N2;
-            Left   := PB - N2;
-            Right  := PA + N2;
-            Bottom := PB + N2;
+            Top_Vertex    := PA - N2;
+            Left_Vertex   := PB - N2;
+            Right_Vertex  := PA + N2;
+            Bottom_Vertex := PB + N2;
          end if;
 
          --  Snap verticies to the subpixel grid and convert them to Fixed_16
          --  representation.
 
-         Top_X    := To_Fixed_16 (To_Fixed_6 (Top.X));
-         Top_Y    := To_Fixed_16 (To_Fixed_6 (Top.Y));
-         Left_X   := To_Fixed_16 (To_Fixed_6 (Left.X));
-         Left_Y   := To_Fixed_16 (To_Fixed_6 (Left.Y));
-         Right_X  := To_Fixed_16 (To_Fixed_6 (Right.X));
-         Right_Y  := To_Fixed_16 (To_Fixed_6 (Right.Y));
-         Bottom_X := To_Fixed_16 (To_Fixed_6 (Bottom.X));
-         Bottom_Y := To_Fixed_16 (To_Fixed_6 (Bottom.Y));
+         Top_Vertex_X    := To_Fixed_16 (To_Fixed_6 (Top_Vertex.X));
+         Top_Vertex_Y    := To_Fixed_16 (To_Fixed_6 (Top_Vertex.Y));
+         Left_Vertex_X   := To_Fixed_16 (To_Fixed_6 (Left_Vertex.X));
+         Left_Vertex_Y   := To_Fixed_16 (To_Fixed_6 (Left_Vertex.Y));
+         Right_Vertex_X  := To_Fixed_16 (To_Fixed_6 (Right_Vertex.X));
+         Right_Vertex_Y  := To_Fixed_16 (To_Fixed_6 (Right_Vertex.Y));
+         Bottom_Vertex_X := To_Fixed_16 (To_Fixed_6 (Bottom_Vertex.X));
+         Bottom_Vertex_Y := To_Fixed_16 (To_Fixed_6 (Bottom_Vertex.Y));
 
          --  Compute slope of the lines of edges of the rectangle.
 
-         Top_Left_Slope     :=
-           Divide_Saturated (Left_X - Top_X, Left_Y - Top_Y);
-         Top_Right_Slope    :=
-           Divide_Saturated (Right_X - Top_X, Right_Y - Top_Y);
-         Bottom_Left_Slope  :=
-           Divide_Saturated (Left_X - Bottom_X, Left_Y - Bottom_Y);
-         Bottom_Right_Slope :=
-           Divide_Saturated (Right_X - Bottom_X, Right_Y - Bottom_Y);
+         Top_Left_Slope_X     :=
+           Divide_Saturated
+             (Left_Vertex_X - Top_Vertex_X, Left_Vertex_Y - Top_Vertex_Y);
+         Top_Right_Slope_X    :=
+           Divide_Saturated
+             (Right_Vertex_X - Top_Vertex_X, Right_Vertex_Y - Top_Vertex_Y);
+         Bottom_Left_Slope_X  :=
+           Divide_Saturated
+             (Left_Vertex_X - Bottom_Vertex_X,
+              Left_Vertex_Y - Bottom_Vertex_Y);
+         Bottom_Right_Slope_X :=
+           Divide_Saturated
+             (Right_Vertex_X - Bottom_Vertex_X,
+              Right_Vertex_Y - Bottom_Vertex_Y);
 
          --  Select slopes of the line at left and line at right sides.
 
-         DL := Top_Left_Slope;
-         DR := Top_Right_Slope;
+         DL := Top_Left_Slope_X;
+         DR := Top_Right_Slope_X;
 
          --  Compute intersection of the current left and right lines with up
          --  and down edges of the device pixel.
 
-         Left_Up := Top_X - (Fractional (Top_Y)) * Top_Left_Slope;
-         Right_Up := Top_X - (Fractional (Top_Y)) * Top_Right_Slope;
-         Left_Down := Top_X + (One - Fractional (Top_Y)) * Top_Left_Slope;
-         Right_Down := Top_X + (One - Fractional (Top_Y)) * Top_Right_Slope;
+         Left_Edge_Row_Up    :=
+           Top_Vertex_X - (Fractional (Top_Vertex_Y)) * Top_Left_Slope_X;
+         Right_Edge_Row_Up   :=
+           Top_Vertex_X - (Fractional (Top_Vertex_Y)) * Top_Right_Slope_X;
+         Left_Edge_Row_Down  :=
+           Top_Vertex_X + (One - Fractional (Top_Vertex_Y)) * Top_Left_Slope_X;
+         Right_Edge_Row_Down :=
+           Top_Vertex_X + (One - Fractional (Top_Vertex_Y)) * Top_Right_Slope_X;
 
-         Y := Integral (Top_Y);
+         Y := Integral (Top_Vertex_Y);
 
          loop
             --  Limit horizontal span by the line's left and right edges
             --  intersection with pixel's top and bottom edges, and clip by
             --  horizontal position of the left and right vertices.
 
-            L := Max (Left_X, Min (Left_Up, Left_Down));
-            R := Min (Right_X, Max (Right_Up, Right_Down));
+            L :=
+              Max (Left_Vertex_X, Min (Left_Edge_Row_Up, Left_Edge_Row_Down));
+            R :=
+              Min
+                (Right_Vertex_X, Max (Right_Edge_Row_Up, Right_Edge_Row_Down));
 
             Fill_Span (Integral (L), Y, Integral (R) - Integral (L) + 1, 255);
 
-            Left_Up  := Left_Down;
-            Right_Up := Right_Down;
+            Left_Edge_Row_Up  := Left_Edge_Row_Down;
+            Right_Edge_Row_Up := Right_Edge_Row_Down;
 
-            if Y = Integral (Left_Y) then
+            if Y = Integral (Left_Vertex_Y) then
                --  Pixel of the left vertex has bean reached, switch direction
                --  of the left line to the bottom vertex.
 
-               DL        := Bottom_Left_Slope;
-               Left_Up   := Left_X + Fractional (Left_Y) * Bottom_Left_Slope;
-               Left_Down :=
-                 Left_X - (One - Fractional (Left_Y)) * Bottom_Left_Slope;
+               DL                 := Bottom_Left_Slope_X;
+               Left_Edge_Row_Up   :=
+                 Left_Vertex_X
+                   + Fractional (Left_Vertex_Y) * Bottom_Left_Slope_X;
+               Left_Edge_Row_Down :=
+                 Left_Vertex_X
+                   - (One - Fractional (Left_Vertex_Y)) * Bottom_Left_Slope_X;
             end if;
 
-            if Y = Integral (Right_Y) then
+            if Y = Integral (Right_Vertex_Y) then
                --  Pixel of the right vertex has bean reached, switch direction
                --  of the left line to the bottom vertex.
 
-               DR         := Bottom_Right_Slope;
-               Right_Up := Right_X + Fractional (Right_Y) * Bottom_Right_Slope;
-               Right_Down :=
-                 Right_X - (One - Fractional (Right_Y)) * Bottom_Right_Slope;
+               DR                  := Bottom_Right_Slope_X;
+               Right_Edge_Row_Up   :=
+                 Right_Vertex_X
+                   + Fractional (Right_Vertex_Y) * Bottom_Right_Slope_X;
+               Right_Edge_Row_Down :=
+                 Right_Vertex_X
+                   - (One - Fractional (Right_Vertex_Y)) * Bottom_Right_Slope_X;
             end if;
 
-            exit when Y = Integral (Bottom_Y + One);
+            exit when Y = Integral (Bottom_Vertex_Y + One);
 
-            Y          := @ + 1;
-            Left_Down  := @ + DL;
-            Right_Down := @ + DR;
+            Y                   := @ + 1;
+            Left_Edge_Row_Down  := @ + DL;
+            Right_Edge_Row_Down := @ + DR;
          end loop;
       end;
    end Rasterize_Line;
