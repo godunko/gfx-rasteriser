@@ -510,7 +510,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
              + (One - Fractional (Top_Vertex_Y)) * Top_Right_Slope_X;
 
          Row_Top    := Floor (Top_Vertex_Y);
-         Row_Bottom := Ceiling_Minus_Delta (Top_Vertex_Y);
+         Row_Bottom := Row_Top + One;
 
          loop
             --  Rasterline's span is divided into up to three segments:
@@ -537,7 +537,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
             --  Do rasterization of the rasterline
 
             Pixel_Left  := Floor (LS);
-            Pixel_Right := Ceiling_Minus_Delta (LS);
+            Pixel_Right := Pixel_Left + One;
 
             Left_Edge_Row_Left :=
               Top_Vertex_Y - (Top_Vertex_X - Floor (LS)) * Left_Slope_Y;
@@ -548,7 +548,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
                Pixel_Coverage := One;
 
                if Left_Edge_Pixel_Left < Row_Top then
-                  if Left_Edge_Row_Down <= Pixel_Right then
+                  if Left_Edge_Row_Down < Pixel_Right then
                      Pixel_Coverage :=
                        @
                        - (Fractional (Left_Edge_Row_Up)
@@ -566,8 +566,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
                              / 2);
                   end if;
 
-               elsif Left_Edge_Pixel_Left > Row_Bottom then
-                  if Left_Edge_Row_Up <= Pixel_Right then
+               elsif Left_Edge_Pixel_Left >= Row_Bottom then
+                  if Left_Edge_Row_Up < Pixel_Right then
                      Pixel_Coverage :=
                        @
                        - (Fractional (Left_Edge_Row_Up)
@@ -598,7 +598,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
                Left_Edge_Pixel_Left := @ + Left_Slope_Y;
 
-               Pixel_Left  := @ + One;
+               Pixel_Left  := Pixel_Right;
                Pixel_Right := @ + One;
             end loop;
 
@@ -609,12 +609,12 @@ package body GFX.Drawing.Primitive_Rasterizer is
                   Integral (RS) - Integral (Pixel_Left),
                   255);
                Pixel_Left  := Floor (RS);
-               Pixel_Right := @ + One;
+               Pixel_Right := Pixel_Left + One;
             end if;
 
             while Pixel_Left <= Ceiling_Minus_Delta (RE) loop
                Fill_Span (Integral (Pixel_Left), Integral (Row_Top), 1, 64);
-               Pixel_Left  := @ + One;
+               Pixel_Left  := Pixel_Right;
                Pixel_Right := @ + One;
             end loop;
 
