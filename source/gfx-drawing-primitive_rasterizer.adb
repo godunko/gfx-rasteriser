@@ -385,8 +385,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
          DL : Fixed_16;
          DR : Fixed_16;
 
-         X : Device_Pixel_Index;
-         Y : Device_Pixel_Index;
+         X       : Device_Pixel_Index;
+         Row_Top : Fixed_16;
 
       begin
          --  Compute vertcies of the rectangle to be rasterized.
@@ -450,7 +450,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Right_Edge_Row_Down :=
            Top_Vertex_X + (One - Fractional (Top_Vertex_Y)) * Top_Right_Slope_X;
 
-         Y := Integral (Top_Vertex_Y);
+         Row_Top := Floor (Top_Vertex_Y);
 
          loop
             --  Rasterline's span is divided into up to three segments:
@@ -479,24 +479,24 @@ package body GFX.Drawing.Primitive_Rasterizer is
             X := Integral (LS);
 
             while X <= Integral (LE) loop
-               Fill_Span (X, Y, 1, 64);
+               Fill_Span (X, Integral (Row_Top), 1, 64);
                X := @ + 1;
             end loop;
 
             if X < Integral (RS) then
-               Fill_Span (X, Y, Integral (RS) - X, 255);
+               Fill_Span (X, Integral (Row_Top), Integral (RS) - X, 255);
                X := Integral (RS);
             end if;
 
             while X <= Integral (RE) loop
-               Fill_Span (X, Y, 1, 128);
+               Fill_Span (X, Integral (Row_Top), 1, 128);
                X := @ + 1;
             end loop;
 
             Left_Edge_Row_Up  := Left_Edge_Row_Down;
             Right_Edge_Row_Up := Right_Edge_Row_Down;
 
-            if Y = Integral (Left_Vertex_Y) then
+            if Row_Top = Floor (Left_Vertex_Y) then
                --  Pixel of the left vertex has bean reached, switch direction
                --  of the left line to the bottom vertex.
 
@@ -509,7 +509,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
                    - (One - Fractional (Left_Vertex_Y)) * Bottom_Left_Slope_X;
             end if;
 
-            if Y = Integral (Right_Vertex_Y) then
+            if Row_Top = Floor (Right_Vertex_Y) then
                --  Pixel of the right vertex has bean reached, switch direction
                --  of the left line to the bottom vertex.
 
@@ -522,9 +522,9 @@ package body GFX.Drawing.Primitive_Rasterizer is
                    - (One - Fractional (Right_Vertex_Y)) * Bottom_Right_Slope_X;
             end if;
 
-            exit when Y = Integral (Bottom_Vertex_Y + One);
+            exit when Row_Top = Floor (Bottom_Vertex_Y + One);
 
-            Y                   := @ + 1;
+            Row_Top             := @ + One;
             Left_Edge_Row_Down  := @ + DL;
             Right_Edge_Row_Down := @ + DR;
          end loop;
