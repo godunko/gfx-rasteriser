@@ -99,6 +99,8 @@ is
    --
    --  ??? Not a fractional part, it is distance from the left pixel boundary.
 
+   function Floor (Item : Fixed_16) return Fixed_16;
+
    function Multiply_Coverage
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
    --  Multiply two given fixed point values and return result rounded toward
