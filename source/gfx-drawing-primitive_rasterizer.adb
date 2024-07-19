@@ -286,6 +286,55 @@ package body GFX.Drawing.Primitive_Rasterizer is
       return Lower <= Value and Value <= Upper;
    end Is_In;
 
+   --------------------------
+   -- Luminance_Top_Vertex --
+   --------------------------
+
+   procedure Luminance_Top_Vertex
+     (Top_Vertex_X               : Fixed_16;
+      Top_Vertex_Y               : Fixed_16;
+      Pixel_Top                  : Fixed_16;
+      Pixel_Bottom               : Fixed_16;
+
+      Left_Edge_At_Pixel_Left    : Fixed_16;
+      Left_Edge_At_Pixel_Bottom  : Fixed_16;
+
+      Right_Edge_At_Pixel_Left   : Fixed_16;
+      Right_Edge_At_Pixel_Bottom : Fixed_16;
+      Right_Edge_Slope_Y         : Fixed_16;
+
+      Luminance                 : out Fixed_16)
+   is
+      Right_Edge_At_Pixel_Right : constant Fixed_16 :=
+        Right_Edge_At_Pixel_Left
+          + (One - Fixed_16_Delta_Fixed) * Right_Edge_Slope_Y;
+
+   begin
+      Luminance := One;
+
+      if Left_Edge_At_Pixel_Left > Pixel_Bottom then
+         Luminance :=
+           @
+           - Left_Coverage (Left_Edge_At_Pixel_Bottom)
+           - (Left_Coverage (Top_Vertex_Y) + One) / 2
+               * (Top_Vertex_X - Left_Edge_At_Pixel_Bottom);
+
+      else
+         raise Program_Error;
+      end if;
+
+      if Right_Edge_At_Pixel_Right > Pixel_Bottom then
+         Luminance :=
+           @
+           - Right_Coverage (Right_Edge_At_Pixel_Bottom)
+           - (Left_Coverage (Top_Vertex_Y) + One) / 2
+              * (Right_Edge_At_Pixel_Bottom - Top_Vertex_X);
+
+      else
+         raise Program_Error;
+      end if;
+   end Luminance_Top_Vertex;
+
    --------------------
    -- Rasterize_Line --
    --------------------
@@ -418,16 +467,19 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Bottom_Right_Slope_Y : Fixed_16 with Volatile;
          --  Slopes of the edge lines of the drawn rectangle in fixed point.
 
-         Left_Edge_Row_Up     : Fixed_16 with Volatile;
-         Right_Edge_Row_Up    : Fixed_16 with Volatile;
-         Left_Edge_Row_Down   : Fixed_16 with Volatile;
-         Right_Edge_Row_Down  : Fixed_16 with Volatile;
+         Left_Edge_Row_Up         : Fixed_16 with Volatile;
+         Right_Edge_At_Row_Top    : Fixed_16 with Volatile;
+         Left_Edge_Row_Down       : Fixed_16 with Volatile;
+         Right_Edge_At_Row_Bottom : Fixed_16 with Volatile;
          --  X coordinate of the intersection of the edge line of the draw
          --  rectangle with the current rasterline.
 
          Left_Edge_Row_Left     : Fixed_16 with Volatile;
          Left_Edge_Pixel_Left   : Fixed_16 with Volatile;
          Left_Edge_Pixel_Right  : Fixed_16 with Volatile;
+
+         Right_Edge_At_Pixel_Left   : Fixed_16 with Volatile;
+         Right_Edge_At_Pixel_Right  : Fixed_16 with Volatile;
 
          LS  : Fixed_16 with Volatile;
          LE  : Fixed_16 with Volatile;
@@ -516,15 +568,14 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Row_Top    := Floor (Top_Vertex_Y);
          Row_Bottom := Row_Top + One - Fixed_16_Delta_Fixed;
 
-         Left_Edge_Row_Up    :=
+         Left_Edge_Row_Up         :=
            Left_Vertex_X - (Left_Vertex_Y - Row_Top) * Left_Slope_X;
-         Right_Edge_Row_Up   :=
-           Top_Vertex_X - (Fractional (Top_Vertex_Y)) * Top_Right_Slope_X;
-         Left_Edge_Row_Down  :=
+         Left_Edge_Row_Down       :=
            Left_Vertex_X - (Left_Vertex_Y - Row_Bottom) * Left_Slope_X;
-         Right_Edge_Row_Down :=
-           Top_Vertex_X
-             + (One - Fractional (Top_Vertex_Y)) * Top_Right_Slope_X;
+         Right_Edge_At_Row_Top    :=
+           Right_Vertex_X - (Right_Vertex_Y - Row_Top) * Right_Slope_X;
+         Right_Edge_At_Row_Bottom :=
+           Right_Vertex_X - (Right_Vertex_Y - Row_Bottom) * Right_Slope_X;
 
          loop
             Row_Bottom := Row_Top + One - Fixed_16_Delta_Fixed;
@@ -542,8 +593,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
             LS := Min (Left_Edge_Row_Up, Left_Edge_Row_Down);
             LE := Max (Left_Edge_Row_Up, Left_Edge_Row_Down);
-            RS := Min (Right_Edge_Row_Up, Right_Edge_Row_Down);
-            RE := Max (Right_Edge_Row_Up, Right_Edge_Row_Down);
+            RS := Min (Right_Edge_At_Row_Top, Right_Edge_At_Row_Bottom);
+            RE := Max (Right_Edge_At_Row_Top, Right_Edge_At_Row_Bottom);
 
             LS := Max (Left_Vertex_X, LS);
             RE := Min (Right_Vertex_X, RE);
@@ -559,8 +610,27 @@ package body GFX.Drawing.Primitive_Rasterizer is
               Left_Vertex_Y - (Left_Vertex_X - Floor (LS)) * Left_Slope_Y;
 
             Left_Edge_Pixel_Left := Left_Edge_Row_Left;
+            Right_Edge_At_Pixel_Left :=
+              Right_Vertex_Y - (Right_Vertex_X - Floor (RE)) * Right_Slope_Y;
 
             while Pixel_Left <= Ceiling_Minus_Delta (LE) loop
+               if Integral (Row_Bottom) = Integral (Top_Vertex_Y)
+                 and Integral (Pixel_Left) = Integral (Top_Vertex_X)
+               then
+                  Luminance_Top_Vertex
+                    (Top_Vertex_X               => Top_Vertex_X,
+                     Top_Vertex_Y               => Top_Vertex_Y,
+                     Pixel_Top                  => Row_Top,
+                     Pixel_Bottom               => Row_Bottom,
+                     Left_Edge_At_Pixel_Left    => Left_Edge_Pixel_Left,
+                     Left_Edge_At_Pixel_Bottom  => Left_Edge_Row_Down,
+                     Right_Edge_At_Pixel_Left   => Right_Edge_At_Pixel_Left,
+                     Right_Edge_At_Pixel_Bottom => Right_Edge_At_Row_Bottom,
+                     Right_Edge_Slope_Y         => Right_Slope_Y,
+                     Luminance                  => Pixel_Coverage);
+
+               else
+
                Pixel_Coverage := One;
 
                if Left_Edge_Pixel_Left < Row_Top then
@@ -640,6 +710,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
                      raise Program_Error;
                   end if;
                end if;
+               end if;
 
                Fill_Span
                  (Integral (Pixel_Left),
@@ -647,10 +718,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
                   1,
                   Grayscale (Integral (255 * Pixel_Coverage)));
 
-               Left_Edge_Pixel_Left := @ + Left_Slope_Y;
-
-               Pixel_Left  := @ + One;
-               Pixel_Right := @ + One;
+               Left_Edge_Pixel_Left     := @ + Left_Slope_Y;
+               Right_Edge_At_Pixel_Left := @ + Right_Slope_Y;
+               Pixel_Left               := @ + One;
+               Pixel_Right              := @ + One;
             end loop;
 
             if Pixel_Left < Floor (RS) then
@@ -660,23 +731,122 @@ package body GFX.Drawing.Primitive_Rasterizer is
                   Integral (RS) - Integral (Pixel_Left),
                   255);
                Pixel_Left  := Floor (RS);
-               Pixel_Right := Pixel_Left + One;
+               Pixel_Right := Ceiling_Minus_Delta (RS);
             end if;
 
+            Right_Edge_At_Pixel_Left :=
+              Right_Vertex_Y - (Right_Vertex_X - Floor (RS)) * Right_Slope_Y;
+
             while Pixel_Left <= Ceiling_Minus_Delta (RE) loop
-               Fill_Span (Integral (Pixel_Left), Integral (Row_Top), 1, 64);
-               Pixel_Left  := Pixel_Right;
-               Pixel_Right := @ + One;
+               Pixel_Coverage := One;
+
+               if Right_Edge_At_Pixel_Left < Row_Top then
+                  if Right_Edge_At_Row_Bottom < Pixel_Right then
+                     pragma Assert
+                       (Is_In
+                          (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
+                     pragma Assert
+                       (Is_In
+                          (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
+
+                     Pixel_Coverage :=
+                       @
+                       - (Right_Coverage (Right_Edge_At_Row_Top)
+                            + Right_Coverage (Right_Edge_At_Row_Bottom)) / 2;
+
+                  else
+                     Right_Edge_At_Pixel_Right :=
+                       Right_Edge_At_Pixel_Left + Right_Slope_Y;
+
+                     pragma Assert
+                       (Is_In
+                          (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
+                     pragma Assert
+                       (Is_In
+                          (Row_Top, Right_Edge_At_Pixel_Right, Row_Bottom));
+
+                     Pixel_Coverage :=
+                       @
+                       - Right_Coverage (Right_Edge_At_Row_Top)
+                         * Left_Coverage (Right_Edge_At_Pixel_Right)
+                         / 2;
+                  end if;
+
+               elsif Right_Edge_At_Pixel_Left > Row_Bottom then
+                  if Right_Edge_At_Row_Top <= Pixel_Right then
+                     raise Program_Error;
+
+                  else
+                     Right_Edge_At_Pixel_Right :=
+                       Right_Edge_At_Pixel_Left
+                         + (One - Fixed_16_Delta_Fixed) * Right_Slope_Y;
+
+                     pragma Assert
+                       (Is_In
+                          (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
+                     pragma Assert
+                       (Is_In
+                          (Row_Top, Right_Edge_At_Pixel_Right, Row_Bottom));
+
+                     Pixel_Coverage :=
+                       @
+                       - Right_Coverage (Right_Edge_At_Pixel_Right)
+                         * Right_Coverage (Right_Edge_At_Row_Bottom)
+                         / 2;
+                  end if;
+
+               else
+                  if Right_Edge_At_Pixel_Left + Right_Slope_Y < Row_Top then
+                     pragma Assert
+                       (Is_In
+                          (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
+                     pragma Assert
+                       (Is_In (Row_Top, Right_Edge_At_Pixel_Left, Row_Bottom));
+
+                     Pixel_Coverage :=
+                       @
+                       - (One
+                          - Left_Coverage (Right_Edge_At_Pixel_Left)
+                            * Left_Coverage (Right_Edge_At_Row_Top)
+                            / 2);
+
+                  elsif Right_Edge_At_Pixel_Left + Right_Slope_Y > Row_Bottom
+                  then
+                     pragma Assert
+                       (Is_In
+                          (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
+                     pragma Assert
+                       (Is_In (Row_Top, Right_Edge_At_Pixel_Left, Row_Bottom));
+
+                     Pixel_Coverage :=
+                       @
+                       - (One
+                          - Right_Coverage (Right_Edge_At_Pixel_Left)
+                            * Left_Coverage (Right_Edge_At_Row_Bottom)
+                            / 2);
+
+                  else
+                     raise Program_Error;
+                  end if;
+               end if;
+
+               Fill_Span
+                 (Integral (Pixel_Left),
+                  Integral (Row_Top),
+                  1,
+                  Grayscale (Integral (255 * Pixel_Coverage)));
+
+               Right_Edge_At_Pixel_Left := @ + Right_Slope_Y;
+               Pixel_Left               := @ + One;
+               Pixel_Right              := @ + One;
             end loop;
 
             exit when Row_Top = Floor (Bottom_Vertex_Y + One);
 
             --  Compute data for the next iteration
 
-            Right_Edge_Row_Up := Right_Edge_Row_Down;
-
             if Row_Top = Floor (Left_Vertex_Y) then
-               --  Pixel of the left vertex has bean reached, switch direction
+               --  Pixel of the left vertex has been reached, switch direction
                --  of the left line to the bottom vertex.
 
                Left_Slope_X       := Bottom_Left_Slope_X;
@@ -694,16 +864,20 @@ package body GFX.Drawing.Primitive_Rasterizer is
                --  Pixel of the right vertex has bean reached, switch direction
                --  of the left line to the bottom vertex.
 
-               Right_Slope_X       := Bottom_Right_Slope_X;
-               Right_Slope_Y       := Bottom_Right_Slope_Y;
-               Right_Edge_Row_Up   :=
-                 Right_Vertex_X + Fractional (Right_Vertex_Y) * Right_Slope_X;
-               Right_Edge_Row_Down := Right_Edge_Row_Up;
+               Right_Slope_X            := Bottom_Right_Slope_X;
+               Right_Slope_Y            := Bottom_Right_Slope_Y;
+               Right_Edge_At_Row_Top    :=
+                 Right_Vertex_X - (Right_Vertex_Y - Row_Top) * Right_Slope_X;
+               Right_Edge_At_Row_Bottom :=
+                 Right_Vertex_X
+                   - (Right_Vertex_Y - Row_Bottom) * Right_Vertex_X;
             end if;
 
-            Row_Top             := @ + One;
-            Row_Bottom          := @ + One;
-            Right_Edge_Row_Down := @ + Right_Slope_X;
+            Right_Edge_At_Row_Top    := @ + Right_Slope_X;
+            Right_Edge_At_Row_Bottom := @ + Right_Slope_X;
+
+            Row_Top    := @ + One;
+            Row_Bottom := @ + One;
          end loop;
       end;
    end Rasterize_Line;
