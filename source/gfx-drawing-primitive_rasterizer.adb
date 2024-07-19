@@ -513,6 +513,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Row_Bottom := Row_Top + One;
 
          loop
+            Row_Bottom := Row_Top + One;
+
             --  Rasterline's span is divided into up to three segments:
             --   - intersection with the left edge line
             --   - span of the solid area
@@ -547,7 +549,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
             while Pixel_Left <= Ceiling_Minus_Delta (LE) loop
                Pixel_Coverage := One;
 
-               if Left_Edge_Pixel_Left < Row_Top then
+               if Left_Edge_Pixel_Left <= Row_Top then
                   if Left_Edge_Row_Down < Pixel_Right then
                      Pixel_Coverage :=
                        @
