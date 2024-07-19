@@ -34,6 +34,16 @@ package body GFX.Drawing.Primitive_Rasterizer is
       Left_Bottom_Edge_Slope_Y         : Fixed_16;
       Luminance                        : in out Fixed_16);
 
+   procedure Luminance_Left_Edge
+     (Pixel_Top                 : Fixed_16;
+      Pixel_Right               : Fixed_16;
+      Pixel_Bottom              : Fixed_16;
+      Left_Edge_At_Pixel_Top    : Fixed_16;
+      Left_Edge_At_Pixel_Left   : Fixed_16;
+      Left_Edge_At_Pixel_Bottom : Fixed_16;
+      Left_Edge_Slope_Y         : Fixed_16;
+      Luminance                 : in out Fixed_16);
+
    procedure Luminance_Right_Edge
      (Pixel_Top                  : Fixed_16;
       Pixel_Bottom               : Fixed_16;
@@ -307,6 +317,100 @@ package body GFX.Drawing.Primitive_Rasterizer is
    begin
       return Lower <= Value and Value <= Upper;
    end Is_In;
+
+   -------------------------
+   -- Luminance_Left_Edge --
+   -------------------------
+
+   procedure Luminance_Left_Edge
+     (Pixel_Top                 : Fixed_16;
+      Pixel_Right               : Fixed_16;
+      Pixel_Bottom              : Fixed_16;
+      Left_Edge_At_Pixel_Top    : Fixed_16;
+      Left_Edge_At_Pixel_Left   : Fixed_16;
+      Left_Edge_At_Pixel_Bottom : Fixed_16;
+      Left_Edge_Slope_Y         : Fixed_16;
+      Luminance                 : in out Fixed_16)
+   is
+      Left_Edge_At_Pixel_Right : Fixed_16;
+
+   begin
+      if Left_Edge_At_Pixel_Left < Pixel_Top then
+         if Left_Edge_At_Pixel_Bottom < Pixel_Right then
+            Luminance :=
+              @
+                - (Fractional (Left_Edge_At_Pixel_Top)
+                     + Fractional (Left_Edge_At_Pixel_Bottom)) / 2;
+
+         else
+            Left_Edge_At_Pixel_Right :=
+              Left_Edge_At_Pixel_Left + Left_Edge_Slope_Y;
+
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Left_Edge_Row_Up, Pixel_Right));
+            pragma Assert
+              (Is_In (Pixel_Top, Left_Edge_At_Pixel_Right, Pixel_Bottom));
+
+            Luminance :=
+              @
+                - (One
+                     - Right_Coverage (Left_Edge_At_Pixel_Top)
+                         * Left_Coverage (Left_Edge_At_Pixel_Right)
+                 / 2);
+         end if;
+
+      elsif Left_Edge_At_Pixel_Left > Pixel_Bottom then
+         if Left_Edge_At_Pixel_Top <= Pixel_Right then
+            Luminance :=
+              @
+              - (Fractional (Left_Edge_At_Pixel_Top)
+                 + Fractional (Left_Edge_At_Pixel_Bottom)) / 2;
+
+         else
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Left_Edge_Row_Down, Pixel_Right));
+            pragma Assert
+              (Is_In (Pixel_Top, Left_Edge_At_Pixel_Right, Pixel_Bottom));
+
+            Luminance :=
+              @
+                - (One
+                     - Right_Coverage (Left_Edge_At_Pixel_Bottom)
+                     * Right_Coverage (Left_Edge_At_Pixel_Right)
+                       / 2);
+         end if;
+
+      else
+         if Left_Edge_At_Pixel_Left + Left_Edge_Slope_Y < Pixel_Top then
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Left_Edge_Row_Up, Pixel_Right));
+            pragma Assert
+              (Is_In (Pixel_Top, Left_Edge_At_Pixel_Left, Pixel_Bottom));
+
+            Luminance :=
+              @
+                - Left_Coverage (Left_Edge_At_Pixel_Top)
+                    * Left_Coverage (Left_Edge_At_Pixel_Left)
+                    / 2;
+
+         elsif Left_Edge_At_Pixel_Left + Left_Edge_Slope_Y > Pixel_Bottom then
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Left_Edge_Row_Down, Pixel_Right));
+            pragma Assert
+              (Is_In (Pixel_Top, Left_Edge_At_Pixel_Left, Pixel_Bottom));
+
+            Luminance :=
+              @
+              - (One
+                   - Left_Coverage (Left_Edge_At_Pixel_Bottom)
+                   * Right_Coverage (Left_Edge_At_Pixel_Left)
+                   / 2);
+
+         else
+            raise Program_Error;
+         end if;
+      end if;
+   end Luminance_Left_Edge;
 
    ---------------------------
    -- Luminance_Left_Vertex --
@@ -661,8 +765,9 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Left_Edge_Pixel_Left   : Fixed_16 with Volatile;
          Left_Edge_Pixel_Right  : Fixed_16 with Volatile;
 
-         Left_Bottom_Edge_At_Pixel_Left   : Fixed_16;
-         Left_Bottom_Edge_At_Pixel_Bottom : Fixed_16;
+         Left_Bottom_Edge_At_Row_Top    : Fixed_16;
+         Left_Bottom_Edge_At_Pixel_Left : Fixed_16;
+         Left_Bottom_Edge_At_Row_Bottom : Fixed_16;
 
          Right_Edge_At_Pixel_Left   : Fixed_16 with Volatile;
          Right_Edge_At_Pixel_Right  : Fixed_16 with Volatile;
@@ -798,7 +903,6 @@ package body GFX.Drawing.Primitive_Rasterizer is
             Left_Edge_Pixel_Left := Left_Edge_Row_Left;
             Right_Edge_At_Pixel_Left :=
               Right_Vertex_Y - (Right_Vertex_X - Floor (LS)) * Right_Slope_Y;
-              --  Right_Vertex_Y - (Right_Vertex_X - Floor (RE)) * Right_Slope_Y;
 
             while Pixel_Left <= Ceiling_Minus_Delta (LE) loop
                Pixel_Coverage := One;
@@ -824,7 +928,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
                   Left_Bottom_Edge_At_Pixel_Left :=
                     Left_Vertex_Y
                       - (Left_Vertex_X - Pixel_Left) * Bottom_Left_Slope_Y;
-                  Left_Bottom_Edge_At_Pixel_Bottom :=
+                  Left_Bottom_Edge_At_Row_Bottom :=
                     Left_Vertex_X
                       - (Left_Vertex_Y - Row_Bottom) * Bottom_Left_Slope_X;
 
@@ -838,88 +942,48 @@ package body GFX.Drawing.Primitive_Rasterizer is
                      Left_Bottom_Edge_At_Pixel_Left   =>
                        Left_Bottom_Edge_At_Pixel_Left,
                      Left_Bottom_Edge_At_Pixel_Bottom =>
-                       Left_Bottom_Edge_At_Pixel_Bottom,
+                       Left_Bottom_Edge_At_Row_Bottom,
                      Left_Bottom_Edge_Slope_Y         => Bottom_Left_Slope_Y,
                      Luminance                        => Pixel_Coverage);
 
                else
+                  Luminance_Left_Edge
+                    (Pixel_Top                 => Row_Top,
+                     Pixel_Right               => Pixel_Right,
+                     Pixel_Bottom              => Row_Bottom,
+                     Left_Edge_At_Pixel_Top    => Left_Edge_Row_Up,
+                     Left_Edge_At_Pixel_Left   => Left_Edge_Pixel_Left,
+                     Left_Edge_At_Pixel_Bottom => Left_Edge_Row_Down,
+                     Left_Edge_Slope_Y         => Left_Slope_Y,
+                     Luminance                 => Pixel_Coverage);
 
-               if Left_Edge_Pixel_Left < Row_Top then
-                  if Left_Edge_Row_Down < Pixel_Right then
-                     Pixel_Coverage :=
-                       @
-                       - (Fractional (Left_Edge_Row_Up)
-                          + Fractional (Left_Edge_Row_Down)) / 2;
+                  if Integral (Row_Bottom) = Integral (Left_Vertex_Y) then
+                     Left_Bottom_Edge_At_Pixel_Left :=
+                       Left_Vertex_Y
+                         - (Left_Vertex_X - Pixel_Left) * Bottom_Left_Slope_Y;
+                     Left_Bottom_Edge_At_Row_Top    :=
+                       Left_Vertex_X
+                         - (Left_Vertex_Y - Row_Top) * Bottom_Left_Slope_X;
+                     Left_Bottom_Edge_At_Row_Bottom :=
+                       Left_Vertex_X
+                         - (Left_Vertex_Y - Row_Bottom) * Bottom_Left_Slope_X;
 
-                  else
-                     Left_Edge_Pixel_Right :=
-                       Left_Edge_Pixel_Left + Left_Slope_Y;
-
-                     pragma Assert
-                       (Is_In (Pixel_Left, Left_Edge_Row_Up, Pixel_Right));
-                     pragma Assert
-                       (Is_In (Row_Top, Left_Edge_Pixel_Right, Row_Bottom));
-
-                     Pixel_Coverage :=
-                       @
-                       - (One
-                          - Right_Coverage (Left_Edge_Row_Up)
-                            * Left_Coverage (Left_Edge_Pixel_Right)
-                            / 2);
-                  end if;
-
-               elsif Left_Edge_Pixel_Left > Row_Bottom then
-                  if Left_Edge_Row_Up <= Pixel_Right then
-                     Pixel_Coverage :=
-                       @
-                       - (Fractional (Left_Edge_Row_Up)
-                          + Fractional (Left_Edge_Row_Down)) / 2;
-
-                  else
-                     pragma Assert
-                       (Is_In (Pixel_Left, Left_Edge_Row_Down, Pixel_Right));
-                     pragma Assert
-                       (Is_In (Row_Top, Left_Edge_Pixel_Right, Row_Bottom));
-
-                     Pixel_Coverage :=
-                       @
-                       - (One
-                          - Right_Coverage (Left_Edge_Row_Down)
-                            * Right_Coverage (Left_Edge_Pixel_Right)
-                            / 2);
-                  end if;
-
-               else
-                  if Left_Edge_Pixel_Left + Left_Slope_Y < Row_Top then
-                     pragma Assert
-                       (Is_In (Pixel_Left, Left_Edge_Row_Up, Pixel_Right));
-                     pragma Assert
-                       (Is_In (Row_Top, Left_Edge_Pixel_Left, Row_Bottom));
-
-                     Pixel_Coverage :=
-                       @
-                       - Left_Coverage (Left_Edge_Row_Up)
-                         * Left_Coverage (Left_Edge_Pixel_Left)
-                         / 2;
-
-                  elsif Left_Edge_Pixel_Left + Left_Slope_Y > Row_Bottom then
-                     pragma Assert
-                       (Is_In (Pixel_Left, Left_Edge_Row_Down, Pixel_Right));
-                     pragma Assert
-                       (Is_In (Row_Top, Left_Edge_Pixel_Left, Row_Bottom));
-
-                     Pixel_Coverage :=
-                       @
-                       - (One
-                          - Left_Coverage (Left_Edge_Row_Down)
-                            * Right_Coverage (Left_Edge_Pixel_Left)
-                            / 2);
-
-                  else
-                     Pixel_Coverage := @ - One;
-
-                     raise Program_Error;
-                  end if;
+                     if Integral (Pixel_Left)
+                       <= Integral (Left_Bottom_Edge_At_Row_Bottom)
+                     then
+                        Luminance_Left_Edge
+                          (Pixel_Top                 => Row_Top,
+                           Pixel_Right               => Pixel_Right,
+                           Pixel_Bottom              => Row_Bottom,
+                           Left_Edge_At_Pixel_Top    =>
+                             Left_Bottom_Edge_At_Row_Top,
+                           Left_Edge_At_Pixel_Left   =>
+                             Left_Bottom_Edge_At_Pixel_Left,
+                           Left_Edge_At_Pixel_Bottom =>
+                             Left_Bottom_Edge_At_Row_Bottom,
+                           Left_Edge_Slope_Y         => Bottom_Left_Slope_Y,
+                           Luminance                 => Pixel_Coverage);
+                     end if;
                   end if;
 
                   if RS <= Pixel_Right then
