@@ -601,7 +601,11 @@ package body GFX.Drawing.Primitive_Rasterizer is
          end if;
 
       else
-         if Right_Edge_At_Pixel_Left + Right_Edge_Slope_Y < Pixel_Top then
+         Right_Edge_At_Pixel_Right :=
+           Right_Edge_At_Pixel_Left
+             + (One - Fixed_16_Delta_Fixed) * Right_Edge_Slope_Y;
+
+         if Right_Edge_At_Pixel_Right < Pixel_Top then
             --  pragma Assert
             --    (Is_In (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
             pragma Assert
@@ -614,8 +618,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
                          * Left_Coverage (Right_Edge_At_Pixel_Top)
                          / 2);
 
-         elsif Right_Edge_At_Pixel_Left + Right_Edge_Slope_Y > Pixel_Bottom
-         then
+         elsif Right_Edge_At_Pixel_Right > Pixel_Bottom then
             --  pragma Assert
             --    (Is_In (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
             pragma Assert
