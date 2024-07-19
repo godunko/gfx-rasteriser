@@ -22,6 +22,18 @@ package body GFX.Drawing.Primitive_Rasterizer is
      (Lower : Fixed_16; Value : Fixed_16; Upper : Fixed_16) return Boolean;
    --  Returns True when Value is in [Lower, Upper].
 
+   procedure Luminance_Left_Vertex
+     (Left_Vertex_X                    : Fixed_16;
+      Left_Vertex_Y                    : Fixed_16;
+      Pixel_Right                      : Fixed_16;
+      Left_Top_Edge_At_Pixel_Top       : Fixed_16;
+      Left_Top_Edge_At_Pixel_Left      : Fixed_16;
+      Left_Top_Edge_Slope_Y            : Fixed_16;
+      Left_Bottom_Edge_At_Pixel_Left   : Fixed_16;
+      Left_Bottom_Edge_At_Pixel_Bottom : Fixed_16;
+      Left_Bottom_Edge_Slope_Y         : Fixed_16;
+      Luminance                        : in out Fixed_16);
+
    procedure Luminance_Right_Edge
      (Pixel_Top                  : Fixed_16;
       Pixel_Bottom               : Fixed_16;
@@ -296,6 +308,59 @@ package body GFX.Drawing.Primitive_Rasterizer is
       return Lower <= Value and Value <= Upper;
    end Is_In;
 
+   ---------------------------
+   -- Luminance_Left_Vertex --
+   ---------------------------
+
+   procedure Luminance_Left_Vertex
+     (Left_Vertex_X                    : Fixed_16;
+      Left_Vertex_Y                    : Fixed_16;
+      Pixel_Right                      : Fixed_16;
+      Left_Top_Edge_At_Pixel_Top       : Fixed_16;
+      Left_Top_Edge_At_Pixel_Left      : Fixed_16;
+      Left_Top_Edge_Slope_Y            : Fixed_16;
+      Left_Bottom_Edge_At_Pixel_Left   : Fixed_16;
+      Left_Bottom_Edge_At_Pixel_Bottom : Fixed_16;
+      Left_Bottom_Edge_Slope_Y         : Fixed_16;
+      Luminance                        : in out Fixed_16)
+   is
+      Left_Top_Edge_At_Pixel_Right    : Fixed_16;
+      Left_Bottom_Edge_At_Pixel_Right : Fixed_16;
+
+   begin
+      if Left_Top_Edge_At_Pixel_Top < Pixel_Right then
+         raise Program_Error;
+
+      else
+         Left_Top_Edge_At_Pixel_Right :=
+           Left_Top_Edge_At_Pixel_Left
+             + (One - Fixed_16_Delta_Fixed) * Left_Top_Edge_Slope_Y;
+
+         Luminance :=
+           @
+             - Left_Coverage (Left_Top_Edge_At_Pixel_Right)
+             - (Left_Coverage (Left_Vertex_X) + One)
+                  / 2
+                  * (Left_Vertex_Y - Left_Top_Edge_At_Pixel_Right);
+      end if;
+
+      if Left_Bottom_Edge_At_Pixel_Bottom < Pixel_Right then
+         raise Program_Error;
+
+      else
+         Left_Bottom_Edge_At_Pixel_Right :=
+           Left_Bottom_Edge_At_Pixel_Left
+             + (One - Fixed_16_Delta_Fixed) * Left_Bottom_Edge_Slope_Y;
+
+         Luminance :=
+           @
+             - (Left_Coverage (Left_Vertex_X) + One)
+                  / 2
+                  * (Left_Bottom_Edge_At_Pixel_Right - Left_Vertex_Y)
+             - Right_Coverage (Left_Bottom_Edge_At_Pixel_Right);
+      end if;
+   end Luminance_Left_Vertex;
+
    --------------------------
    -- Luminance_Right_Edge --
    --------------------------
@@ -419,6 +484,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
    begin
       Luminance := One;
+
+      --  pragma Assert (Left_Edge_At_Pixel_Left >= Top_Vertex_X);
 
       if Left_Edge_At_Pixel_Left > Pixel_Bottom then
          --  pragma Assert (Pixel_Left, Top_Vertex_X, Pixel_Right);
@@ -594,6 +661,9 @@ package body GFX.Drawing.Primitive_Rasterizer is
          Left_Edge_Pixel_Left   : Fixed_16 with Volatile;
          Left_Edge_Pixel_Right  : Fixed_16 with Volatile;
 
+         Left_Bottom_Edge_At_Pixel_Left   : Fixed_16;
+         Left_Bottom_Edge_At_Pixel_Bottom : Fixed_16;
+
          Right_Edge_At_Pixel_Left   : Fixed_16 with Volatile;
          Right_Edge_At_Pixel_Right  : Fixed_16 with Volatile;
 
@@ -731,6 +801,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
               --  Right_Vertex_Y - (Right_Vertex_X - Floor (RE)) * Right_Slope_Y;
 
             while Pixel_Left <= Ceiling_Minus_Delta (LE) loop
+               Pixel_Coverage := One;
+
                if Integral (Row_Bottom) = Integral (Top_Vertex_Y)
                  and Integral (Pixel_Left) = Integral (Top_Vertex_X)
                then
@@ -746,9 +818,31 @@ package body GFX.Drawing.Primitive_Rasterizer is
                      Right_Edge_Slope_Y         => Right_Slope_Y,
                      Luminance                  => Pixel_Coverage);
 
-               else
+               elsif Integral (Row_Bottom) = Integral (Left_Vertex_Y)
+                 and Integral (Pixel_Left) = Integral (Left_Vertex_X)
+               then
+                  Left_Bottom_Edge_At_Pixel_Left :=
+                    Left_Vertex_Y
+                      - (Left_Vertex_X - Pixel_Left) * Bottom_Left_Slope_Y;
+                  Left_Bottom_Edge_At_Pixel_Bottom :=
+                    Left_Vertex_X
+                      - (Left_Vertex_Y - Row_Bottom) * Bottom_Left_Slope_X;
 
-               Pixel_Coverage := One;
+                  Luminance_Left_Vertex
+                    (Left_Vertex_X                    => Left_Vertex_X,
+                     Left_Vertex_Y                    => Left_Vertex_Y,
+                     Pixel_Right                      => Pixel_Right,
+                     Left_Top_Edge_At_Pixel_Top       => Left_Edge_Row_Up,
+                     Left_Top_Edge_At_Pixel_Left      => Left_Edge_Pixel_Left,
+                     Left_Top_Edge_Slope_Y            => Top_Left_Slope_Y,
+                     Left_Bottom_Edge_At_Pixel_Left   =>
+                       Left_Bottom_Edge_At_Pixel_Left,
+                     Left_Bottom_Edge_At_Pixel_Bottom =>
+                       Left_Bottom_Edge_At_Pixel_Bottom,
+                     Left_Bottom_Edge_Slope_Y         => Bottom_Left_Slope_Y,
+                     Luminance                        => Pixel_Coverage);
+
+               else
 
                if Left_Edge_Pixel_Left < Row_Top then
                   if Left_Edge_Row_Down < Pixel_Right then
@@ -898,8 +992,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
                --  Pixel of the left vertex has been reached, switch direction
                --  of the left line to the bottom vertex.
 
-               Left_Slope_X       := Bottom_Left_Slope_X;
-               Left_Slope_Y       := Bottom_Left_Slope_Y;
+               Left_Slope_X        := Bottom_Left_Slope_X;
+               Left_Slope_Y        := Bottom_Left_Slope_Y;
                Left_Edge_Row_Up    :=
                  Left_Vertex_X - (Left_Vertex_Y - Row_Top) * Left_Slope_X;
                Left_Edge_Row_Down  :=
