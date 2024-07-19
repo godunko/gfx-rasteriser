@@ -1159,7 +1159,7 @@ package body GFX.Drawing.Primitive_Rasterizer is
                  Right_Vertex_X - (Right_Vertex_Y - Row_Top) * Right_Slope_X;
                Right_Edge_At_Row_Bottom :=
                  Right_Vertex_X
-                   - (Right_Vertex_Y - Row_Bottom) * Right_Vertex_X;
+                   - (Right_Vertex_Y - Row_Bottom) * Right_Slope_X;
             end if;
 
             Right_Edge_At_Row_Top    := @ + Right_Slope_X;
