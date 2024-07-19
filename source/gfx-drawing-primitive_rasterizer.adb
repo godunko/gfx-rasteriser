@@ -22,6 +22,16 @@ package body GFX.Drawing.Primitive_Rasterizer is
      (Lower : Fixed_16; Value : Fixed_16; Upper : Fixed_16) return Boolean;
    --  Returns True when Value is in [Lower, Upper].
 
+   procedure Luminance_Right_Edge
+     (Pixel_Top                  : Fixed_16;
+      Pixel_Bottom               : Fixed_16;
+      Pixel_Right                : Fixed_16;
+      Right_Edge_At_Pixel_Left   : Fixed_16;
+      Right_Edge_At_Pixel_Top    : Fixed_16;
+      Right_Edge_At_Pixel_Bottom : Fixed_16;
+      Right_Edge_Slope_Y         : Fixed_16;
+      Luminance                  : in out Fixed_16);
+
    -----------------------------
    -- Internal_Fill_Rectangle --
    -----------------------------
@@ -287,6 +297,107 @@ package body GFX.Drawing.Primitive_Rasterizer is
    end Is_In;
 
    --------------------------
+   -- Luminance_Right_Edge --
+   --------------------------
+
+   procedure Luminance_Right_Edge
+     (Pixel_Top                  : Fixed_16;
+      Pixel_Bottom               : Fixed_16;
+      Pixel_Right                : Fixed_16;
+      Right_Edge_At_Pixel_Left   : Fixed_16;
+      Right_Edge_At_Pixel_Top    : Fixed_16;
+      Right_Edge_At_Pixel_Bottom : Fixed_16;
+      Right_Edge_Slope_Y         : Fixed_16;
+      Luminance                  : in out Fixed_16)
+   is
+      Right_Edge_At_Pixel_Right : Fixed_16;
+
+   begin
+      if Right_Edge_At_Pixel_Left < Pixel_Top then
+         if Right_Edge_At_Pixel_Bottom < Pixel_Right then
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
+
+            Luminance :=
+              @
+                - (Right_Coverage (Right_Edge_At_Pixel_Top)
+                     + Right_Coverage (Right_Edge_At_Pixel_Bottom)) / 2;
+
+         else
+            Right_Edge_At_Pixel_Right :=
+              Right_Edge_At_Pixel_Left
+                + (One - Fixed_16_Delta_Fixed) * Right_Edge_Slope_Y;
+
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
+            pragma Assert
+              (Is_In (Pixel_Top, Right_Edge_At_Pixel_Right, Pixel_Bottom));
+
+            Luminance :=
+              @
+                - Right_Coverage (Right_Edge_At_Pixel_Top)
+                    * Left_Coverage (Right_Edge_At_Pixel_Right)
+                    / 2;
+         end if;
+
+      elsif Right_Edge_At_Pixel_Left > Pixel_Bottom then
+         if Right_Edge_At_Pixel_Top <= Pixel_Right then
+            raise Program_Error;
+
+         else
+            Right_Edge_At_Pixel_Right :=
+              Right_Edge_At_Pixel_Left
+                + (One - Fixed_16_Delta_Fixed) * Right_Edge_Slope_Y;
+
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
+            pragma Assert
+              (Is_In (Pixel_Top, Right_Edge_At_Pixel_Right, Pixel_Bottom));
+
+            Luminance :=
+              @
+                - Right_Coverage (Right_Edge_At_Pixel_Right)
+                    * Right_Coverage (Right_Edge_At_Pixel_Bottom)
+                    / 2;
+         end if;
+
+      else
+         if Right_Edge_At_Pixel_Left + Right_Edge_Slope_Y < Pixel_Top then
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
+            pragma Assert
+              (Is_In (Pixel_Top, Right_Edge_At_Pixel_Left, Pixel_Bottom));
+
+            Luminance :=
+              @
+                - (One
+                     - Left_Coverage (Right_Edge_At_Pixel_Left)
+                         * Left_Coverage (Right_Edge_At_Pixel_Top)
+                         / 2);
+
+         elsif Right_Edge_At_Pixel_Left + Right_Edge_Slope_Y > Pixel_Bottom
+         then
+            --  pragma Assert
+            --    (Is_In (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
+            pragma Assert
+              (Is_In (Pixel_Top, Right_Edge_At_Pixel_Left, Pixel_Bottom));
+
+            Luminance :=
+              @
+                - (One
+                     - Right_Coverage (Right_Edge_At_Pixel_Left)
+                         * Left_Coverage (Right_Edge_At_Pixel_Bottom)
+                         / 2);
+
+         else
+            raise Program_Error;
+         end if;
+      end if;
+   end Luminance_Right_Edge;
+
+   --------------------------
    -- Luminance_Top_Vertex --
    --------------------------
 
@@ -295,15 +406,12 @@ package body GFX.Drawing.Primitive_Rasterizer is
       Top_Vertex_Y               : Fixed_16;
       Pixel_Top                  : Fixed_16;
       Pixel_Bottom               : Fixed_16;
-
       Left_Edge_At_Pixel_Left    : Fixed_16;
       Left_Edge_At_Pixel_Bottom  : Fixed_16;
-
       Right_Edge_At_Pixel_Left   : Fixed_16;
       Right_Edge_At_Pixel_Bottom : Fixed_16;
       Right_Edge_Slope_Y         : Fixed_16;
-
-      Luminance                 : out Fixed_16)
+      Luminance                  : out Fixed_16)
    is
       Right_Edge_At_Pixel_Right : constant Fixed_16 :=
         Right_Edge_At_Pixel_Left
@@ -313,6 +421,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
       Luminance := One;
 
       if Left_Edge_At_Pixel_Left > Pixel_Bottom then
+         --  pragma Assert (Pixel_Left, Top_Vertex_X, Pixel_Right);
+         --  pragma Assert
+         --    (Is_In (Pixel_Left, Left_Edge_At_Pixel_Bottom, Pixel_Right));
+
          Luminance :=
            @
            - Left_Coverage (Left_Edge_At_Pixel_Bottom)
@@ -324,6 +436,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
       end if;
 
       if Right_Edge_At_Pixel_Right > Pixel_Bottom then
+         --  pragma Assert (Is_In (Pixel_Left, Top_Vertex_X, Pixel_Right));
+         --  pragma Assert
+         --    (Is_In (Pixel_Left, Right_Edge_At_Pixel_Bottom, Pixel_Right));
+
          Luminance :=
            @
            - Right_Coverage (Right_Edge_At_Pixel_Bottom)
@@ -611,7 +727,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
             Left_Edge_Pixel_Left := Left_Edge_Row_Left;
             Right_Edge_At_Pixel_Left :=
-              Right_Vertex_Y - (Right_Vertex_X - Floor (RE)) * Right_Slope_Y;
+              Right_Vertex_Y - (Right_Vertex_X - Floor (LS)) * Right_Slope_Y;
+              --  Right_Vertex_Y - (Right_Vertex_X - Floor (RE)) * Right_Slope_Y;
 
             while Pixel_Left <= Ceiling_Minus_Delta (LE) loop
                if Integral (Row_Bottom) = Integral (Top_Vertex_Y)
@@ -709,7 +826,19 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
                      raise Program_Error;
                   end if;
-               end if;
+                  end if;
+
+                  if RS <= Pixel_Right then
+                     Luminance_Right_Edge
+                       (Pixel_Top                  => Row_Top,
+                        Pixel_Bottom               => Row_Bottom,
+                        Pixel_Right                => Pixel_Right,
+                        Right_Edge_At_Pixel_Left   => Right_Edge_At_Pixel_Left,
+                        Right_Edge_At_Pixel_Top    => Right_Edge_At_Row_Top,
+                        Right_Edge_At_Pixel_Bottom => Right_Edge_At_Row_Bottom,
+                        Right_Edge_Slope_Y         => Right_Slope_Y,
+                        Luminance                  => Pixel_Coverage);
+                  end if;
                end if;
 
                Fill_Span
@@ -740,95 +869,15 @@ package body GFX.Drawing.Primitive_Rasterizer is
             while Pixel_Left <= Ceiling_Minus_Delta (RE) loop
                Pixel_Coverage := One;
 
-               if Right_Edge_At_Pixel_Left < Row_Top then
-                  if Right_Edge_At_Row_Bottom < Pixel_Right then
-                     pragma Assert
-                       (Is_In
-                          (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
-                     pragma Assert
-                       (Is_In
-                          (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
-
-                     Pixel_Coverage :=
-                       @
-                       - (Right_Coverage (Right_Edge_At_Row_Top)
-                            + Right_Coverage (Right_Edge_At_Row_Bottom)) / 2;
-
-                  else
-                     Right_Edge_At_Pixel_Right :=
-                       Right_Edge_At_Pixel_Left + Right_Slope_Y;
-
-                     pragma Assert
-                       (Is_In
-                          (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
-                     pragma Assert
-                       (Is_In
-                          (Row_Top, Right_Edge_At_Pixel_Right, Row_Bottom));
-
-                     Pixel_Coverage :=
-                       @
-                       - Right_Coverage (Right_Edge_At_Row_Top)
-                         * Left_Coverage (Right_Edge_At_Pixel_Right)
-                         / 2;
-                  end if;
-
-               elsif Right_Edge_At_Pixel_Left > Row_Bottom then
-                  if Right_Edge_At_Row_Top <= Pixel_Right then
-                     raise Program_Error;
-
-                  else
-                     Right_Edge_At_Pixel_Right :=
-                       Right_Edge_At_Pixel_Left
-                         + (One - Fixed_16_Delta_Fixed) * Right_Slope_Y;
-
-                     pragma Assert
-                       (Is_In
-                          (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
-                     pragma Assert
-                       (Is_In
-                          (Row_Top, Right_Edge_At_Pixel_Right, Row_Bottom));
-
-                     Pixel_Coverage :=
-                       @
-                       - Right_Coverage (Right_Edge_At_Pixel_Right)
-                         * Right_Coverage (Right_Edge_At_Row_Bottom)
-                         / 2;
-                  end if;
-
-               else
-                  if Right_Edge_At_Pixel_Left + Right_Slope_Y < Row_Top then
-                     pragma Assert
-                       (Is_In
-                          (Pixel_Left, Right_Edge_At_Row_Top, Pixel_Right));
-                     pragma Assert
-                       (Is_In (Row_Top, Right_Edge_At_Pixel_Left, Row_Bottom));
-
-                     Pixel_Coverage :=
-                       @
-                       - (One
-                          - Left_Coverage (Right_Edge_At_Pixel_Left)
-                            * Left_Coverage (Right_Edge_At_Row_Top)
-                            / 2);
-
-                  elsif Right_Edge_At_Pixel_Left + Right_Slope_Y > Row_Bottom
-                  then
-                     pragma Assert
-                       (Is_In
-                          (Pixel_Left, Right_Edge_At_Row_Bottom, Pixel_Right));
-                     pragma Assert
-                       (Is_In (Row_Top, Right_Edge_At_Pixel_Left, Row_Bottom));
-
-                     Pixel_Coverage :=
-                       @
-                       - (One
-                          - Right_Coverage (Right_Edge_At_Pixel_Left)
-                            * Left_Coverage (Right_Edge_At_Row_Bottom)
-                            / 2);
-
-                  else
-                     raise Program_Error;
-                  end if;
-               end if;
+               Luminance_Right_Edge
+                 (Pixel_Top                  => Row_Top,
+                  Pixel_Bottom               => Row_Bottom,
+                  Pixel_Right                => Pixel_Right,
+                  Right_Edge_At_Pixel_Left   => Right_Edge_At_Pixel_Left,
+                  Right_Edge_At_Pixel_Top    => Right_Edge_At_Row_Top,
+                  Right_Edge_At_Pixel_Bottom => Right_Edge_At_Row_Bottom,
+                  Right_Edge_Slope_Y         => Right_Slope_Y,
+                  Luminance                  => Pixel_Coverage);
 
                Fill_Span
                  (Integral (Pixel_Left),
