@@ -145,7 +145,7 @@ package body GFX.Implementation.Fixed_Types is
 
    function Ceiling_Minus_Delta (Item : Fixed_16) return Fixed_16 is
    begin
-      return Fixed_16 (To_Unsigned (Item) or 16#FFFF#);
+      return To_Fixed_16 (To_Unsigned (Item) or 16#FFFF#);
    end Ceiling_Minus_Delta;
 
    ----------------------------
