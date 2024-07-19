@@ -22,6 +22,18 @@ package body GFX.Drawing.Primitive_Rasterizer is
      (Lower : Fixed_16; Value : Fixed_16; Upper : Fixed_16) return Boolean;
    --  Returns True when Value is in [Lower, Upper].
 
+   procedure Luminance_Top_Vertex
+     (Top_Vertex_X               : Fixed_16;
+      Top_Vertex_Y               : Fixed_16;
+      Pixel_Top                  : Fixed_16;
+      Pixel_Bottom               : Fixed_16;
+      Left_Edge_At_Pixel_Left    : Fixed_16;
+      Left_Edge_At_Pixel_Bottom  : Fixed_16;
+      Right_Edge_At_Pixel_Left   : Fixed_16;
+      Right_Edge_At_Pixel_Bottom : Fixed_16;
+      Right_Edge_Slope_Y         : Fixed_16;
+      Luminance                  : out Fixed_16);
+
    procedure Luminance_Left_Vertex
      (Left_Vertex_X                    : Fixed_16;
       Left_Vertex_Y                    : Fixed_16;
@@ -33,6 +45,17 @@ package body GFX.Drawing.Primitive_Rasterizer is
       Left_Bottom_Edge_At_Pixel_Bottom : Fixed_16;
       Left_Bottom_Edge_Slope_Y         : Fixed_16;
       Luminance                        : in out Fixed_16);
+
+   procedure Luminance_Bottom_Vertex
+     (Bottom_Vertex_X          : Fixed_16;
+      Bottom_Vertex_Y          : Fixed_16;
+      Pixel_Top                : Fixed_16;
+      Left_Edge_At_Pixel_Top   : Fixed_16;
+      Left_Edge_At_Pixel_Left  : Fixed_16;
+      Right_Edge_At_Pixel_Top  : Fixed_16;
+      Right_Edge_At_Pixel_Left : Fixed_16;
+      Right_Edge_Slope_Y       : Fixed_16;
+      Luminance                : in out Fixed_16);
 
    procedure Luminance_Left_Edge
      (Pixel_Top                 : Fixed_16;
@@ -317,6 +340,51 @@ package body GFX.Drawing.Primitive_Rasterizer is
    begin
       return Lower <= Value and Value <= Upper;
    end Is_In;
+
+   -----------------------------
+   -- Luminance_Bottom_Vertex --
+   -----------------------------
+
+   procedure Luminance_Bottom_Vertex
+     (Bottom_Vertex_X          : Fixed_16;
+      Bottom_Vertex_Y          : Fixed_16;
+      Pixel_Top                : Fixed_16;
+      Left_Edge_At_Pixel_Top   : Fixed_16;
+      Left_Edge_At_Pixel_Left  : Fixed_16;
+      Right_Edge_At_Pixel_Top  : Fixed_16;
+      Right_Edge_At_Pixel_Left : Fixed_16;
+      Right_Edge_Slope_Y       : Fixed_16;
+      Luminance                : in out Fixed_16)
+   is
+      Right_Edge_At_Pixel_Right : constant Fixed_16 :=
+        Right_Edge_At_Pixel_Left
+          + (One - Fixed_16_Delta_Fixed) * Right_Edge_Slope_Y;
+
+   begin
+      if Left_Edge_At_Pixel_Left < Pixel_Top then
+         Luminance :=
+           @
+             - Left_Coverage (Left_Edge_At_Pixel_Top)
+             - (Right_Coverage (Bottom_Vertex_Y) + One)
+                  / 2
+                  * (Bottom_Vertex_X - Left_Edge_At_Pixel_Top);
+
+      else
+         raise Program_Error;
+      end if;
+
+      if Right_Edge_At_Pixel_Right < Pixel_Top then
+         raise Program_Error;
+
+      else
+         Luminance :=
+           @
+           - (Right_Coverage (Bottom_Vertex_Y)
+                + Right_Coverage (Right_Edge_At_Pixel_Right))
+              / 2
+              * Right_Coverage (Bottom_Vertex_X);
+      end if;
+   end Luminance_Bottom_Vertex;
 
    -------------------------
    -- Luminance_Left_Edge --
@@ -945,6 +1013,20 @@ package body GFX.Drawing.Primitive_Rasterizer is
                        Left_Bottom_Edge_At_Row_Bottom,
                      Left_Bottom_Edge_Slope_Y         => Bottom_Left_Slope_Y,
                      Luminance                        => Pixel_Coverage);
+
+               elsif Integral (Row_Bottom) = Integral (Bottom_Vertex_Y)
+                 and Integral (Pixel_Left) = Integral (Bottom_Vertex_X)
+               then
+                  Luminance_Bottom_Vertex
+                    (Bottom_Vertex_X          => Bottom_Vertex_X,
+                     Bottom_Vertex_Y          => Bottom_Vertex_Y,
+                     Pixel_Top                => Row_Top,
+                     Left_Edge_At_Pixel_Top   => Left_Edge_Row_Up,
+                     Left_Edge_At_Pixel_Left  => Left_Edge_Pixel_Left,
+                     Right_Edge_At_Pixel_Top  => Right_Edge_At_Row_Top,
+                     Right_Edge_At_Pixel_Left => Right_Edge_At_Pixel_Left,
+                     Right_Edge_Slope_Y       => Bottom_Right_Slope_Y,
+                     Luminance                => Pixel_Coverage);
 
                else
                   Luminance_Left_Edge
