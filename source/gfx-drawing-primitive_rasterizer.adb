@@ -26,6 +26,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
      (Top_Vertex_X               : Fixed_16;
       Top_Vertex_Y               : Fixed_16;
       Pixel_Top                  : Fixed_16;
+      Pixel_Left                 : Fixed_16;
+      Pixel_Right                : Fixed_16;
       Pixel_Bottom               : Fixed_16;
       Left_Edge_At_Pixel_Left    : Fixed_16;
       Left_Edge_At_Pixel_Bottom  : Fixed_16;
@@ -50,6 +52,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
      (Bottom_Vertex_X          : Fixed_16;
       Bottom_Vertex_Y          : Fixed_16;
       Pixel_Top                : Fixed_16;
+      Pixel_Left               : Fixed_16;
+      Pixel_Right              : Fixed_16;
       Left_Edge_At_Pixel_Top   : Fixed_16;
       Left_Edge_At_Pixel_Left  : Fixed_16;
       Right_Edge_At_Pixel_Top  : Fixed_16;
@@ -349,6 +353,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
      (Bottom_Vertex_X          : Fixed_16;
       Bottom_Vertex_Y          : Fixed_16;
       Pixel_Top                : Fixed_16;
+      Pixel_Left               : Fixed_16;
+      Pixel_Right              : Fixed_16;
       Left_Edge_At_Pixel_Top   : Fixed_16;
       Left_Edge_At_Pixel_Left  : Fixed_16;
       Right_Edge_At_Pixel_Top  : Fixed_16;
@@ -361,20 +367,50 @@ package body GFX.Drawing.Primitive_Rasterizer is
           + (One - Fixed_16_Delta_Fixed) * Right_Edge_Slope_Y;
 
    begin
-      if Left_Edge_At_Pixel_Left < Pixel_Top then
+      if Left_Edge_At_Pixel_Top < Pixel_Left then
+         --  +-------+
+         --  x -     |
+         --  |   *   |
+         --  | X |   |
+         --  +-------+
+
+         Luminance :=
+           @
+             - (Right_Coverage (Left_Edge_At_Pixel_Left)
+                  + Right_Coverage (Bottom_Vertex_Y))
+                / 2
+                * Left_Coverage (Bottom_Vertex_X);
+
+      else
+         --  +-x-----+
+         --  |  \    |
+         --  |   *   |
+         --  | X |   |
+         --  +-------+
+
          Luminance :=
            @
              - Left_Coverage (Left_Edge_At_Pixel_Top)
              - (Right_Coverage (Bottom_Vertex_Y) + One)
                   / 2
-                  * (Bottom_Vertex_X - Left_Edge_At_Pixel_Top);
-
-      else
-         raise Program_Error;
+                  * (Bottom_Vertex_X - Left_Edge_At_Pixel_Top
+                       + Fixed_16_Delta_Fixed);
       end if;
 
-      if Right_Edge_At_Pixel_Right < Pixel_Top then
-         raise Program_Error;
+      if Right_Edge_At_Pixel_Top < Pixel_Right then
+         --  +-----x-+
+         --  |    /  |
+         --  |   *   |
+         --  |   | X |
+         --  +-------+
+
+         Luminance :=
+           @
+             - Right_Coverage (Right_Edge_At_Pixel_Top)
+             - (Right_Coverage (Bottom_Vertex_Y) + One)
+               / 2
+               * (Right_Edge_At_Pixel_Top - Bottom_Vertex_X
+                    + Fixed_16_Delta_Fixed);
 
       else
          Luminance :=
@@ -501,7 +537,18 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
    begin
       if Left_Top_Edge_At_Pixel_Top < Pixel_Right then
-         raise Program_Error;
+         --  +-----x-+
+         --  | X  /  |
+         --  |---*   |
+         --  |       |
+         --  +-------+
+
+         Luminance :=
+           @
+             - (Left_Coverage (Left_Top_Edge_At_Pixel_Top)
+                  + Left_Coverage (Left_Vertex_X))
+                / 2
+                * Left_Coverage (Left_Vertex_Y);
 
       else
          Left_Top_Edge_At_Pixel_Right :=
@@ -517,7 +564,18 @@ package body GFX.Drawing.Primitive_Rasterizer is
       end if;
 
       if Left_Bottom_Edge_At_Pixel_Bottom < Pixel_Right then
-         raise Program_Error;
+         --  +-------+
+         --  |       |
+         --  |---*   |
+         --  | X  \  |
+         --  +-----x-+
+
+         Luminance :=
+           @
+             - (Left_Coverage (Left_Vertex_X)
+                  + Left_Coverage (Left_Bottom_Edge_At_Pixel_Bottom))
+                / 2
+                * Right_Coverage (Left_Vertex_Y);
 
       else
          Left_Bottom_Edge_At_Pixel_Right :=
@@ -581,7 +639,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
       elsif Right_Edge_At_Pixel_Left > Pixel_Bottom then
          if Right_Edge_At_Pixel_Top <= Pixel_Right then
-            raise Program_Error;
+            Luminance :=
+              @
+                - (Right_Coverage (Right_Edge_At_Pixel_Top)
+                     + Right_Coverage (Right_Edge_At_Pixel_Bottom)) / 2;
 
          else
             Right_Edge_At_Pixel_Right :=
@@ -632,7 +693,32 @@ package body GFX.Drawing.Primitive_Rasterizer is
                          / 2);
 
          else
-            raise Program_Error;
+            if Right_Edge_Slope_Y < Zero then
+               --  Bottom-right edge
+               --
+               --  +-------+
+               --  |       |
+               --  *-------*
+               --  |   X   |
+               --  +-------+
+
+               Luminance :=
+                 @
+                 - (Right_Coverage (Right_Edge_At_Pixel_Left)
+                    + Right_Coverage (Right_Edge_At_Pixel_Right))
+                    / 2;
+
+            else
+               --  Top-right edge
+               --
+               --  +-------+
+               --  |       |
+               --  *-------*
+               --  |   X   |
+               --  +-------+
+
+               raise Program_Error;
+            end if;
          end if;
       end if;
    end Luminance_Right_Edge;
@@ -645,6 +731,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
      (Top_Vertex_X               : Fixed_16;
       Top_Vertex_Y               : Fixed_16;
       Pixel_Top                  : Fixed_16;
+      Pixel_Left                 : Fixed_16;
+      Pixel_Right                : Fixed_16;
       Pixel_Bottom               : Fixed_16;
       Left_Edge_At_Pixel_Left    : Fixed_16;
       Left_Edge_At_Pixel_Bottom  : Fixed_16;
@@ -658,26 +746,48 @@ package body GFX.Drawing.Primitive_Rasterizer is
           + (One - Fixed_16_Delta_Fixed) * Right_Edge_Slope_Y;
 
    begin
+      pragma Assert (Left_Edge_At_Pixel_Left    >= Top_Vertex_Y);
+      pragma Assert (Left_Edge_At_Pixel_Bottom  <= Top_Vertex_X);
+      pragma Assert (Right_Edge_At_Pixel_Right  >= Top_Vertex_Y);
+      pragma Assert (Right_Edge_At_Pixel_Bottom >= Top_Vertex_X);
+
       Luminance := One;
 
-      --  pragma Assert (Left_Edge_At_Pixel_Left >= Top_Vertex_X);
+      if Left_Edge_At_Pixel_Bottom > Pixel_Left then
+         --  +-------+
+         --  |   |   |
+         --  | X *   |
+         --  |  /    |
+         --  +-x-----+
 
-      if Left_Edge_At_Pixel_Left > Pixel_Bottom then
          --  pragma Assert (Pixel_Left, Top_Vertex_X, Pixel_Right);
          --  pragma Assert
          --    (Is_In (Pixel_Left, Left_Edge_At_Pixel_Bottom, Pixel_Right));
 
          Luminance :=
            @
-           - Left_Coverage (Left_Edge_At_Pixel_Bottom)
-           - (Left_Coverage (Top_Vertex_Y) + One) / 2
-               * (Top_Vertex_X - Left_Edge_At_Pixel_Bottom);
+             - Left_Coverage (Left_Edge_At_Pixel_Bottom)
+             - (Left_Coverage (Top_Vertex_Y) + One)
+               / 2
+               * (Top_Vertex_X - Left_Edge_At_Pixel_Bottom
+                    + Fixed_16_Delta_Fixed);
 
       else
-         raise Program_Error;
+         --  +-------+
+         --  | X |   |
+         --  |   *   |
+         --  x -     |
+         --  +-------+
+
+         Luminance :=
+           @
+             - (Left_Coverage (Left_Edge_At_Pixel_Left)
+                  + Left_Coverage (Top_Vertex_Y))
+                / 2
+                * Left_Coverage (Top_Vertex_X);
       end if;
 
-      if Right_Edge_At_Pixel_Right > Pixel_Bottom then
+      if Right_Edge_At_Pixel_Bottom < Pixel_Right then
          --  pragma Assert (Is_In (Pixel_Left, Top_Vertex_X, Pixel_Right));
          --  pragma Assert
          --    (Is_In (Pixel_Left, Right_Edge_At_Pixel_Bottom, Pixel_Right));
@@ -689,7 +799,18 @@ package body GFX.Drawing.Primitive_Rasterizer is
               * (Right_Edge_At_Pixel_Bottom - Top_Vertex_X);
 
       else
-         raise Program_Error;
+         --  +-------+
+         --  |   | X |
+         --  |   *   |
+         --  |     - x
+         --  +-------+
+
+         Luminance :=
+           @
+           - (Left_Coverage (Top_Vertex_Y)
+                + Left_Coverage (Right_Edge_At_Pixel_Right))
+              / 2
+              * Right_Coverage (Top_Vertex_X);
       end if;
    end Luminance_Top_Vertex;
 
@@ -963,6 +1084,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
             LE := Min (RE, LE);
             RS := Max (LS, RS);
 
+            if Integral (Row_Top) = Integral (Bottom_Vertex_Y) then
+               LE := Min (Bottom_Vertex_X, LE);
+            end if;
+
             --  Do rasterization of the rasterline
 
             Pixel_Left  := Floor (LS);
@@ -985,6 +1110,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
                     (Top_Vertex_X               => Top_Vertex_X,
                      Top_Vertex_Y               => Top_Vertex_Y,
                      Pixel_Top                  => Row_Top,
+                     Pixel_Left                 => Pixel_Left,
+                     Pixel_Right                => Pixel_Right,
                      Pixel_Bottom               => Row_Bottom,
                      Left_Edge_At_Pixel_Left    => Left_Edge_Pixel_Left,
                      Left_Edge_At_Pixel_Bottom  => Left_Edge_Row_Down,
@@ -1024,6 +1151,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
                     (Bottom_Vertex_X          => Bottom_Vertex_X,
                      Bottom_Vertex_Y          => Bottom_Vertex_Y,
                      Pixel_Top                => Row_Top,
+                     Pixel_Left               => Pixel_Left,
+                     Pixel_Right              => Pixel_Right,
                      Left_Edge_At_Pixel_Top   => Left_Edge_Row_Up,
                      Left_Edge_At_Pixel_Left  => Left_Edge_Pixel_Left,
                      Right_Edge_At_Pixel_Top  => Right_Edge_At_Row_Top,
