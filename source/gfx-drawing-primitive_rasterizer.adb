@@ -436,7 +436,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
       Left_Edge_Slope_Y         : Fixed_16;
       Luminance                 : in out Fixed_16)
    is
-      Left_Edge_At_Pixel_Right : Fixed_16;
+      Left_Edge_At_Pixel_Right : constant Fixed_16 :=
+        Left_Edge_At_Pixel_Left + Left_Edge_Slope_Y;
 
    begin
       if Left_Edge_At_Pixel_Left < Pixel_Top then
@@ -447,9 +448,6 @@ package body GFX.Drawing.Primitive_Rasterizer is
                      + Fractional (Left_Edge_At_Pixel_Bottom)) / 2;
 
          else
-            Left_Edge_At_Pixel_Right :=
-              Left_Edge_At_Pixel_Left + Left_Edge_Slope_Y;
-
             --  pragma Assert
             --    (Is_In (Pixel_Left, Left_Edge_Row_Up, Pixel_Right));
             pragma Assert
@@ -511,7 +509,28 @@ package body GFX.Drawing.Primitive_Rasterizer is
                    / 2);
 
          else
-            raise Program_Error;
+            if Left_Edge_Slope_Y < Zero then
+               --  +-------+
+               --  | X   - x
+               --  |   -   |
+               --  x -     |
+               --  +-------+
+
+               Luminance :=
+                 @
+                 - (Left_Coverage (Left_Edge_At_Pixel_Left)
+                      + Left_Coverage (Left_Edge_At_Pixel_Right))
+                      / 2;
+
+            else
+               --  +-------+
+               --  x -     |
+               --  |   -   |
+               --  | X   - x
+               --  +-------+
+
+               raise Program_Error;
+            end if;
          end if;
       end if;
    end Luminance_Left_Edge;
@@ -697,27 +716,32 @@ package body GFX.Drawing.Primitive_Rasterizer is
                --  Bottom-right edge
                --
                --  +-------+
-               --  |       |
-               --  *-------*
-               --  |   X   |
+               --  |     - x
+               --  |   -   |
+               --  x -   X |
                --  +-------+
+
 
                Luminance :=
                  @
-                 - (Right_Coverage (Right_Edge_At_Pixel_Left)
-                    + Right_Coverage (Right_Edge_At_Pixel_Right))
-                    / 2;
+                   - (Right_Coverage (Right_Edge_At_Pixel_Left)
+                        + Right_Coverage (Right_Edge_At_Pixel_Right))
+                      / 2;
 
             else
                --  Top-right edge
                --
                --  +-------+
-               --  |       |
-               --  *-------*
-               --  |   X   |
+               --  x -   X |
+               --  |   -   |
+               --  |     - x
                --  +-------+
 
-               raise Program_Error;
+               Luminance :=
+                 @
+                   - (Left_Coverage (Right_Edge_At_Pixel_Left)
+                        + Right_Coverage (Right_Edge_At_Pixel_Right))
+                      / 2;
             end if;
          end if;
       end if;
