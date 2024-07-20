@@ -518,8 +518,8 @@ package body GFX.Drawing.Primitive_Rasterizer is
 
                Luminance :=
                  @
-                 - (Left_Coverage (Left_Edge_At_Pixel_Left)
-                      + Left_Coverage (Left_Edge_At_Pixel_Right))
+                   - (Left_Coverage (Left_Edge_At_Pixel_Left)
+                        + Left_Coverage (Left_Edge_At_Pixel_Right))
                       / 2;
 
             else
@@ -529,7 +529,11 @@ package body GFX.Drawing.Primitive_Rasterizer is
                --  | X   - x
                --  +-------+
 
-               raise Program_Error;
+               Luminance :=
+                 @
+                   - (Right_Coverage (Left_Edge_At_Pixel_Left)
+                        + Right_Coverage (Left_Edge_At_Pixel_Right))
+                      / 2;
             end if;
          end if;
       end if;
