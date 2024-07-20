@@ -222,7 +222,7 @@ package body GFX.Implementation.Fixed_Types is
 
    function Floor (Item : Fixed_16) return Fixed_16 is
    begin
-      return Fixed_16 (To_Unsigned (Item) and not 16#FFFF#);
+      return To_Fixed_16 (To_Unsigned (Item) and not 16#FFFF#);
    end Floor;
 
    ----------------
