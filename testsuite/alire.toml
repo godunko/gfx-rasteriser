@@ -1,0 +1,22 @@
+name = "gfx_drawing_testsuite"
+description = "Platform Independent Graphics Library Drawing, Testsuite"
+version = "0.1.0-dev"
+
+authors = ["Vadim Godunko"]
+maintainers = ["Vadim Godunko <vgodunko@gmail.com>"]
+maintainers-logins = ["godunko"]
+licenses = "Apache-2.0 WITH LLVM-exception"
+tags = ["graphics"]
+
+project-files = ["gnat/gfx_drawing_testsuite.gpr"]
+
+[configuration]
+generate_ada = false
+generate_c = false
+generate_gpr = true
+
+[[depends-on]]
+gfx_drawing = "*"
+
+[[pins]]
+gfx_drawing = { path='..' }

@@ -1,0 +1,23 @@
+--
+--  Copyright (C) 2024, Vadim Godunko <vgodunko@gmail.com>
+--
+--  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+--
+
+with "../config/gfx_drawing_testsuite_config.gpr";
+
+with "gfx_common.gpr";
+
+project GFX_Drawing_Testsuite is
+
+   for Source_Dirs use ("../source");
+   for Object_Dir use
+     "../.objs/" & GFX_Drawing_Testsuite_Config.Build_Profile & GFX_Common.Object_Dir_Suffix;
+   for Exec_Dir use "../bin";
+   for Main use ("thick_line_1");
+
+   package Compiler is
+      for Switches ("Ada") use GFX_Drawing_Testsuite_Config.Ada_Compiler_Switches & ("-O0", "-g");
+   end Compiler;
+
+end GFX_Drawing_Testsuite;
