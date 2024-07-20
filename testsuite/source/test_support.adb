@@ -8,12 +8,33 @@ with Ada.Strings;       use Ada.Strings;
 with Ada.Strings.Fixed; use Ada.Strings.Fixed;
 with Ada.Text_IO;       use Ada.Text_IO;
 
+with PPM;
+
 package body Test_Support is
 
    use type GFX.Drawing.Device_Pixel_Index;
 
    Current_Y : GFX.Drawing.Device_Pixel_Index :=
      GFX.Drawing.Device_Pixel_Index'First;
+
+   ------------------
+   -- Set_PPM_Span --
+   ------------------
+
+   procedure Set_PPM_Span
+     (X         : GFX.Drawing.Device_Pixel_Index;
+      Y         : GFX.Drawing.Device_Pixel_Index;
+      Width     : GFX.Drawing.Device_Pixel_Count;
+      Luminance : GFX.Drawing.Grayscale)
+   is
+      Color : constant GFX.RGBA8888 :=
+        GFX.To_RGBA (R => Luminance, G => Luminance, B => Luminance, A => 255);
+
+   begin
+      for C in X .. X + Width - 1 loop
+         PPM.Set_Pixel (C, Y, Color);
+      end loop;
+   end Set_PPM_Span;
 
    ----------------
    -- Print_Span --
