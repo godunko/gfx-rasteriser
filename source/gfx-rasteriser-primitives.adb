@@ -11,7 +11,7 @@ pragma Ada_2022;
 with GFX.Implementation.Fixed_Types;
 with GFX.Vectors;
 
-package body GFX.Drawing.Primitive_Rasterizer is
+package body GFX.Rasteriser.Primitives is
 
    use Interfaces;
    use GFX.Implementation.Fixed_Types;
@@ -86,15 +86,15 @@ package body GFX.Drawing.Primitive_Rasterizer is
    -----------------------------
 
    procedure Internal_Fill_Rectangle
-     (Top       : GFX.Drawing.Device_Pixel_Coordinate;
-      Left      : GFX.Drawing.Device_Pixel_Coordinate;
-      Right     : GFX.Drawing.Device_Pixel_Coordinate;
-      Bottom    : GFX.Drawing.Device_Pixel_Coordinate;
+     (Top       : GFX.Rasteriser.Device_Pixel_Coordinate;
+      Left      : GFX.Rasteriser.Device_Pixel_Coordinate;
+      Right     : GFX.Rasteriser.Device_Pixel_Coordinate;
+      Bottom    : GFX.Rasteriser.Device_Pixel_Coordinate;
       Fill_Span : not null access procedure
-        (X        : GFX.Drawing.Device_Pixel_Index;
-         Y        : GFX.Drawing.Device_Pixel_Index;
-         Width    : GFX.Drawing.Device_Pixel_Count;
-         Coverage : GFX.Drawing.Grayscale))
+        (X        : GFX.Rasteriser.Device_Pixel_Index;
+         Y        : GFX.Rasteriser.Device_Pixel_Index;
+         Width    : GFX.Rasteriser.Device_Pixel_Count;
+         Coverage : GFX.Rasteriser.Grayscale))
    is
       T  : constant Fixed_16   := To_Fixed_16 (Top);
       TI : constant GX_Integer := Integral (T);
@@ -113,16 +113,16 @@ package body GFX.Drawing.Primitive_Rasterizer is
       BC : constant Fixed_16   := Left_Coverage (B);
 
       procedure Fill_1
-        (HW : GFX.Drawing.Device_Pixel_Count;
+        (HW : GFX.Rasteriser.Device_Pixel_Count;
          HC : Fixed_16);
       --  Fill each line by one span
 
       procedure Fill_2
-        (LI : GFX.Drawing.Device_Pixel_Index;
-         LW : GFX.Drawing.Device_Pixel_Count;
+        (LI : GFX.Rasteriser.Device_Pixel_Index;
+         LW : GFX.Rasteriser.Device_Pixel_Count;
          LC : Fixed_16;
-         RI : GFX.Drawing.Device_Pixel_Index;
-         RW : GFX.Drawing.Device_Pixel_Count;
+         RI : GFX.Rasteriser.Device_Pixel_Index;
+         RW : GFX.Rasteriser.Device_Pixel_Count;
          RC : Fixed_16);
       --  Fill each line by two spans
 
@@ -134,10 +134,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
       ------------
 
       procedure Fill_1
-        (HW : GFX.Drawing.Device_Pixel_Count;
+        (HW : GFX.Rasteriser.Device_Pixel_Count;
          HC : Fixed_16)
       is
-         HG : constant GFX.Drawing.Grayscale := To_Grayscale (HC);
+         HG : constant GFX.Rasteriser.Grayscale := To_Grayscale (HC);
          AC : Fixed_16;
          Y  : GX_Integer := TI + 1;
 
@@ -173,20 +173,20 @@ package body GFX.Drawing.Primitive_Rasterizer is
       ------------
 
       procedure Fill_2
-        (LI : GFX.Drawing.Device_Pixel_Index;
-         LW : GFX.Drawing.Device_Pixel_Count;
+        (LI : GFX.Rasteriser.Device_Pixel_Index;
+         LW : GFX.Rasteriser.Device_Pixel_Count;
          LC : Fixed_16;
-         RI : GFX.Drawing.Device_Pixel_Index;
-         RW : GFX.Drawing.Device_Pixel_Count;
+         RI : GFX.Rasteriser.Device_Pixel_Index;
+         RW : GFX.Rasteriser.Device_Pixel_Count;
          RC : Fixed_16)
       is
          HC : constant Fixed_16 := (TC + BC) - One;
-         LG : constant GFX.Drawing.Grayscale := To_Grayscale (LC);
-         RG : constant GFX.Drawing.Grayscale := To_Grayscale (RC);
+         LG : constant GFX.Rasteriser.Grayscale := To_Grayscale (LC);
+         RG : constant GFX.Rasteriser.Grayscale := To_Grayscale (RC);
 
-         Y  : GFX.Drawing.Device_Pixel_Index := TI + 1;
-         SG : GFX.Drawing.Grayscale;
-         EG : GFX.Drawing.Grayscale;
+         Y  : GFX.Rasteriser.Device_Pixel_Index := TI + 1;
+         SG : GFX.Rasteriser.Grayscale;
+         EG : GFX.Rasteriser.Grayscale;
 
       begin
          if TI = BI then
@@ -230,16 +230,16 @@ package body GFX.Drawing.Primitive_Rasterizer is
       ------------
 
       procedure Fill_3 is
-         HL : constant GFX.Drawing.Device_Pixel_Count := RI - LI + 1 - 2;
-         LG : constant GFX.Drawing.Grayscale          := To_Grayscale (LC);
-         CG : constant GFX.Drawing.Grayscale          := To_Grayscale (One);
-         RG : constant GFX.Drawing.Grayscale          := To_Grayscale (RC);
+         HL : constant GFX.Rasteriser.Device_Pixel_Count := RI - LI + 1 - 2;
+         LG : constant GFX.Rasteriser.Grayscale          := To_Grayscale (LC);
+         CG : constant GFX.Rasteriser.Grayscale          := To_Grayscale (One);
+         RG : constant GFX.Rasteriser.Grayscale          := To_Grayscale (RC);
 
          HC : Fixed_16;
-         Y  : GFX.Drawing.Device_Pixel_Count := TI + 1;
-         SG : GFX.Drawing.Grayscale;
-         MG : GFX.Drawing.Grayscale;
-         EG : GFX.Drawing.Grayscale;
+         Y  : GFX.Rasteriser.Device_Pixel_Count := TI + 1;
+         SG : GFX.Rasteriser.Grayscale;
+         MG : GFX.Rasteriser.Grayscale;
+         EG : GFX.Rasteriser.Grayscale;
 
       begin
          if TI = BI then
@@ -851,10 +851,10 @@ package body GFX.Drawing.Primitive_Rasterizer is
       Point_B   : GFX.Points.GF_Point;
       Width     : GFX.GX_Real;
       Fill_Span : not null access procedure
-        (X        : GFX.Drawing.Device_Pixel_Index;
-         Y        : GFX.Drawing.Device_Pixel_Index;
-         Width    : GFX.Drawing.Device_Pixel_Count;
-         Coverage : GFX.Drawing.Grayscale))
+        (X        : GFX.Rasteriser.Device_Pixel_Index;
+         Y        : GFX.Rasteriser.Device_Pixel_Index;
+         Width    : GFX.Rasteriser.Device_Pixel_Count;
+         Coverage : GFX.Rasteriser.Grayscale))
       --  Draw_Span : not null Draw_Span_Subprogram)
    is
       pragma Suppress (All_Checks);
@@ -1331,4 +1331,4 @@ package body GFX.Drawing.Primitive_Rasterizer is
       end;
    end Rasterize_Line;
 
-end GFX.Drawing.Primitive_Rasterizer;
+end GFX.Rasteriser.Primitives;

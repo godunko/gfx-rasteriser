@@ -8,7 +8,7 @@ with "../config/gfx_drawing_config.gpr";
 
 with "gfx_common.gpr";
 
-project GFX_Drawing is
+project GFX_Rasteriser is
 
    for Source_Dirs use ("../source");
    for Object_Dir use
@@ -18,4 +18,4 @@ project GFX_Drawing is
       for Switches ("Ada") use GFX_Drawing_Config.Ada_Compiler_Switches;
    end Compiler;
 
-end GFX_Drawing;
+end GFX_Rasteriser;

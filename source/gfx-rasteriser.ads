@@ -53,7 +53,7 @@
 --  number are rounded in different directions. It is ignored by the
 --  algoriphms.
 
-package GFX.Drawing
+package GFX.Rasteriser
   with Pure
 is
 
@@ -70,4 +70,4 @@ is
    subtype Grayscale is Interfaces.Unsigned_8;
    --  Grayscale level.
 
-end GFX.Drawing;
+end GFX.Rasteriser;

@@ -1,5 +1,5 @@
-name = "gfx_drawing"
-description = "Platform Independent Graphics Library Drawing"
+name = "gfx_rasteriser"
+description = "Modular Portable Graphics Library, Primitive's Rasteriser"
 version = "0.1.0-dev"
 
 authors = ["Vadim Godunko"]
@@ -8,7 +8,7 @@ maintainers-logins = ["godunko"]
 licenses = "Apache-2.0 WITH LLVM-exception"
 tags = ["graphics"]
 
-project-files = ["gnat/gfx_drawing.gpr"]
+project-files = ["gnat/gfx_rasteriser.gpr"]
 
 [configuration]
 generate_ada = false
