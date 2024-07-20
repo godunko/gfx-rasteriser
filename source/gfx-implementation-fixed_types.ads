@@ -24,6 +24,7 @@ is
 
    type Fixed_16 is private;
 
+   Zero                 : constant Fixed_16;
    One                  : constant Fixed_16;
    Fixed_16_Delta_Fixed : constant Fixed_16;
 
@@ -132,6 +133,7 @@ private
 
    type Fixed_16 is new GFX.GX_Integer;
 
+   Zero                 : constant Fixed_16 := 0;
    One                  : constant Fixed_16 := 2**16;
    Fixed_16_Delta_Fixed : constant Fixed_16 := 1;
 
