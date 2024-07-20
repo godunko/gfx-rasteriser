@@ -948,54 +948,54 @@ package body GFX.Drawing.Primitive_Rasterizer is
          N2 : constant GF_Vector := Normalize ((V.Y, -V.X)) * (Width / 2.0);
          --  Normal vector of the line with half width length.
 
-         Top_Vertex           : GF_Point with Volatile;
-         Left_Vertex          : GF_Point with Volatile;
-         Right_Vertex         : GF_Point with Volatile;
-         Bottom_Vertex        : GF_Point with Volatile;
+         Top_Vertex           : GF_Point;
+         Left_Vertex          : GF_Point;
+         Right_Vertex         : GF_Point;
+         Bottom_Vertex        : GF_Point;
          --  Verticies of the drawn rectangle
 
-         Top_Vertex_X         : Fixed_16 with Volatile;
-         Top_Vertex_Y         : Fixed_16 with Volatile;
-         Left_Vertex_X        : Fixed_16 with Volatile;
-         Left_Vertex_Y        : Fixed_16 with Volatile;
-         Right_Vertex_X       : Fixed_16 with Volatile;
-         Right_Vertex_Y       : Fixed_16 with Volatile;
-         Bottom_Vertex_X      : Fixed_16 with Volatile;
-         Bottom_Vertex_Y      : Fixed_16 with Volatile;
+         Top_Vertex_X         : Fixed_16;
+         Top_Vertex_Y         : Fixed_16;
+         Left_Vertex_X        : Fixed_16;
+         Left_Vertex_Y        : Fixed_16;
+         Right_Vertex_X       : Fixed_16;
+         Right_Vertex_Y       : Fixed_16;
+         Bottom_Vertex_X      : Fixed_16;
+         Bottom_Vertex_Y      : Fixed_16;
          --  Coordinates of the drawn rectangle's verticies in fixed point.
 
-         Top_Left_Slope_X     : Fixed_16 with Volatile;
-         Top_Left_Slope_Y     : Fixed_16 with Volatile;
-         Top_Right_Slope_X    : Fixed_16 with Volatile;
-         Top_Right_Slope_Y    : Fixed_16 with Volatile;
-         Bottom_Left_Slope_X  : Fixed_16 with Volatile;
-         Bottom_Left_Slope_Y  : Fixed_16 with Volatile;
-         Bottom_Right_Slope_X : Fixed_16 with Volatile;
-         Bottom_Right_Slope_Y : Fixed_16 with Volatile;
+         Top_Left_Slope_X     : Fixed_16;
+         Top_Left_Slope_Y     : Fixed_16;
+         Top_Right_Slope_X    : Fixed_16;
+         Top_Right_Slope_Y    : Fixed_16;
+         Bottom_Left_Slope_X  : Fixed_16;
+         Bottom_Left_Slope_Y  : Fixed_16;
+         Bottom_Right_Slope_X : Fixed_16;
+         Bottom_Right_Slope_Y : Fixed_16;
          --  Slopes of the edge lines of the drawn rectangle in fixed point.
 
-         Left_Edge_Row_Up         : Fixed_16 with Volatile;
-         Right_Edge_At_Row_Top    : Fixed_16 with Volatile;
-         Left_Edge_Row_Down       : Fixed_16 with Volatile;
-         Right_Edge_At_Row_Bottom : Fixed_16 with Volatile;
+         Left_Edge_Row_Up         : Fixed_16;
+         Right_Edge_At_Row_Top    : Fixed_16;
+         Left_Edge_Row_Down       : Fixed_16;
+         Right_Edge_At_Row_Bottom : Fixed_16;
          --  X coordinate of the intersection of the edge line of the draw
          --  rectangle with the current rasterline.
 
-         Left_Edge_Row_Left     : Fixed_16 with Volatile;
-         Left_Edge_Pixel_Left   : Fixed_16 with Volatile;
-         Left_Edge_Pixel_Right  : Fixed_16 with Volatile;
+         Left_Edge_Row_Left     : Fixed_16;
+         Left_Edge_Pixel_Left   : Fixed_16;
+         Left_Edge_Pixel_Right  : Fixed_16;
 
          Left_Bottom_Edge_At_Row_Top    : Fixed_16;
          Left_Bottom_Edge_At_Pixel_Left : Fixed_16;
          Left_Bottom_Edge_At_Row_Bottom : Fixed_16;
 
-         Right_Edge_At_Pixel_Left   : Fixed_16 with Volatile;
-         Right_Edge_At_Pixel_Right  : Fixed_16 with Volatile;
+         Right_Edge_At_Pixel_Left   : Fixed_16;
+         Right_Edge_At_Pixel_Right  : Fixed_16;
 
-         LS  : Fixed_16 with Volatile;
-         LE  : Fixed_16 with Volatile;
-         RS  : Fixed_16 with Volatile;
-         RE  : Fixed_16 with Volatile;
+         LS  : Fixed_16;
+         LE  : Fixed_16;
+         RS  : Fixed_16;
+         RE  : Fixed_16;
          Left_Slope_X  : Fixed_16;
          Left_Slope_Y  : Fixed_16;
          Right_Slope_X : Fixed_16;
