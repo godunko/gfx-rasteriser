@@ -1,6 +1,6 @@
 name = "gfx_rasteriser"
 description = "Modular Portable Graphics Library, Primitive's Rasteriser"
-version = "0.1.0-dev"
+version = "0.1.0"
 
 authors = ["Vadim Godunko"]
 maintainers = ["Vadim Godunko <vgodunko@gmail.com>"]
@@ -16,7 +16,7 @@ generate_c = false
 generate_gpr = true
 
 [[depends-on]]
-gfx_core = "~0.1.0-dev"
+gfx_core = "~0.1.0"
 
 [[pins]]
 gfx_core = { path='../gfx-core' }
