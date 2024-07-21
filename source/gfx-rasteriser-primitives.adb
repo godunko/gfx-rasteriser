@@ -1126,7 +1126,9 @@ package body GFX.Rasteriser.Primitives is
 
             Left_Edge_Pixel_Left := Left_Edge_Row_Left;
             Right_Edge_At_Pixel_Left :=
-              Right_Vertex_Y - (Right_Vertex_X - Floor (LS)) * Right_Slope_Y;
+              Right_Vertex_Y
+                - Multiply_Saturated
+                    (Right_Vertex_X - Floor (LS), Right_Slope_Y);
 
             while Pixel_Left <= Ceiling_Minus_Delta (LE) loop
                Pixel_Coverage := One;
@@ -1264,7 +1266,9 @@ package body GFX.Rasteriser.Primitives is
             end if;
 
             Right_Edge_At_Pixel_Left :=
-              Right_Vertex_Y - (Right_Vertex_X - Floor (RS)) * Right_Slope_Y;
+              Right_Vertex_Y
+                - Multiply_Saturated
+                    (Right_Vertex_X - Floor (RS), Right_Slope_Y);
 
             while Pixel_Left <= Ceiling_Minus_Delta (RE) loop
                Pixel_Coverage := One;
