@@ -59,6 +59,9 @@ is
 
    function "/" (Left : Fixed_16; Right : GX_Integer) return Fixed_16;
 
+   function Multiply_Saturated
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
+
    function Divide_Saturated
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
    --  Divide Left by Right, return GX_Integer'First/GX_Integer'Last on

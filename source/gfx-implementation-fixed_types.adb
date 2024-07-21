@@ -311,6 +311,28 @@ package body GFX.Implementation.Fixed_Types is
           (LH * RH * 2**16 + LH * RL + LL * RH + (LL * RL) / 2**16);
    end Multiply_Coverage;
 
+   ------------------------
+   -- Multiply_Saturated --
+   ------------------------
+
+   function Multiply_Saturated
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16
+   is
+      Aux : constant GX_Integer_2 :=
+        (GX_Integer_2 (Left) * GX_Integer_2 (Right)) / (2 ** 16);
+
+   begin
+      if Aux < GX_Integer_2 (GX_Integer'First) then
+         return Fixed_16 (GX_Integer'First);
+
+      elsif Aux > GX_Integer_2 (GX_Integer'Last) then
+         return Fixed_16 (GX_Integer'Last);
+
+      else
+         return Fixed_16 (Aux);
+      end if;
+   end Multiply_Saturated;
+
    --------------------
    -- Right_Coverage --
    --------------------
