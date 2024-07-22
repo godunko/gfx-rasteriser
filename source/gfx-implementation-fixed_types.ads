@@ -125,8 +125,6 @@ is
 
    function Floor (Item : Fixed_16) return Fixed_16;
 
-   function Ceiling_Minus_Delta (Item : Fixed_16) return Fixed_16;
-
    function Pixel_Lower_Bound (Item : Fixed_16) return Fixed_16;
 
    function Pixel_Upper_Bound (Item : Fixed_16) return Fixed_16;

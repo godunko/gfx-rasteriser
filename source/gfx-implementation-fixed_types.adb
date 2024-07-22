@@ -141,15 +141,6 @@ package body GFX.Implementation.Fixed_Types is
       return Fixed_16 (GX_Integer (Left) / Right);
    end "/";
 
-   -------------------------
-   -- Ceiling_Minus_Delta --
-   -------------------------
-
-   function Ceiling_Minus_Delta (Item : Fixed_16) return Fixed_16 is
-   begin
-      return To_Fixed_16 (To_Unsigned (Item) or Fixed_16_Scale_Mask);
-   end Ceiling_Minus_Delta;
-
    ----------------------------
    -- Distance_From_Previous --
    ----------------------------
