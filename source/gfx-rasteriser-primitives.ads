@@ -40,6 +40,12 @@ is
    --  Draw straight line between given two points of the given width. It
    --  supports anti-aliasing.
 
+   procedure Set_Rendering_Area
+     (Top    : GFX.Rasteriser.Device_Pixel_Index;
+      Left   : GFX.Rasteriser.Device_Pixel_Index;
+      Right  : GFX.Rasteriser.Device_Pixel_Index;
+      Bottom : GFX.Rasteriser.Device_Pixel_Index);
+
 private
 
    procedure Internal_Fill_Rectangle

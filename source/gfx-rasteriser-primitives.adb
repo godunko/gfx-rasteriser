@@ -81,6 +81,12 @@ package body GFX.Rasteriser.Primitives is
       Right_Edge_Slope_Y         : Fixed_16;
       Luminance                  : in out Fixed_16);
 
+   Rendering_Area_Top    : Fixed_16;
+   Rendering_Area_Left   : Fixed_16;
+   Rendering_Area_Right  : Fixed_16;
+   Rendering_Area_Bottom : Fixed_16;
+   --  Bound of the rendering area
+
    -----------------------------
    -- Internal_Fill_Rectangle --
    -----------------------------
@@ -1334,5 +1340,21 @@ package body GFX.Rasteriser.Primitives is
          end loop;
       end;
    end Rasterize_Line;
+
+   ------------------------
+   -- Set_Rendering_Area --
+   ------------------------
+
+   procedure Set_Rendering_Area
+     (Top    : GFX.Rasteriser.Device_Pixel_Index;
+      Left   : GFX.Rasteriser.Device_Pixel_Index;
+      Right  : GFX.Rasteriser.Device_Pixel_Index;
+      Bottom : GFX.Rasteriser.Device_Pixel_Index) is
+   begin
+      Rendering_Area_Left   := Pixel_Lower_Bound (Left);
+      Rendering_Area_Right  := Pixel_Upper_Bound (Right);
+      Rendering_Area_Top    := Pixel_Lower_Bound (Top);
+      Rendering_Area_Bottom := Pixel_Upper_Bound (Bottom);
+   end Set_Rendering_Area;
 
 end GFX.Rasteriser.Primitives;

@@ -12,12 +12,14 @@ package body GFX.Implementation.Fixed_Types is
 
    use Interfaces;
 
-   Fixed_6_Scale    : constant  := 2.0 ** 6;
-   Fixed_16_Scale   : constant  := 2.0 ** 16;
-   Fixed_16_Offset  : constant  := -(2.0 ** 15);
-   Fixed_6_16_Scale : constant GX_Integer := 2 ** 10;
+   Fixed_6_Scale       : constant := 2.0 ** 6;
+   Fixed_16_Scale      : constant := 2.0 ** 16;
+   Fixed_16_Offset     : constant := -(2.0 ** 15);
+   Fixed_16_Scale_I    : constant := 2 ** 16;
+   Fixed_16_Scale_Mask : constant := 2 ** 16 - 1;
+   Fixed_6_16_Scale    : constant GX_Integer := 2 ** 10;
    --  Scale to convert Fixed_6 to Fixed_16 values.
-   Fixed_6_16_Offset : constant := -(2 ** 15);
+   Fixed_6_16_Offset   : constant := -(2 ** 15);
 
    function To_Integer is
      new Ada.Unchecked_Conversion (GX_Unsigned, GX_Integer);
@@ -80,7 +82,7 @@ package body GFX.Implementation.Fixed_Types is
    -- "-" --
    ---------
 
-   function "-" (Right : Fixed_16) return Fixed_16 is
+   overriding function "-" (Right : Fixed_16) return Fixed_16 is
    begin
       return Fixed_16 (-GX_Integer (Right));
    end "-";
@@ -332,6 +334,27 @@ package body GFX.Implementation.Fixed_Types is
          return Fixed_16 (Aux);
       end if;
    end Multiply_Saturated;
+
+   -----------------------
+   -- Pixel_Lower_Bound --
+   -----------------------
+
+   function Pixel_Lower_Bound
+     (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16 is
+   begin
+      return Fixed_16 (Item * GX_Integer (Fixed_16_Scale_I));
+   end Pixel_Lower_Bound;
+
+   -----------------------
+   -- Pixel_Upper_Bound --
+   -----------------------
+
+   function Pixel_Upper_Bound
+     (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16 is
+   begin
+      return
+        Fixed_16 (Item * GX_Integer (Fixed_16_Scale_I) + Fixed_16_Scale_Mask);
+   end Pixel_Upper_Bound;
 
    --------------------
    -- Right_Coverage --

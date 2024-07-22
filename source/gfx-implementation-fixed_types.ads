@@ -22,7 +22,8 @@ is
 
    type Fixed_6 is private;
 
-   type Fixed_16 is private;
+   type Fixed_16 is private
+     with Preelaborable_Initialization;
 
    Zero                 : constant Fixed_16;
    One                  : constant Fixed_16;
@@ -86,6 +87,14 @@ is
    --  bits of precision with the coordinate system offset.
    --
    --  ??? Should it snap to subpixel grid first?
+
+   function Pixel_Lower_Bound
+     (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16;
+   --  Returns lower bound of the given pixel
+
+   function Pixel_Upper_Bound
+     (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16;
+   --  Returns upper bound of the given pixel
 
    function To_Fixed_16 (Item : Fixed_6) return Fixed_16;
    --  Convert given subpixel coordinate to binary fixed point value with
