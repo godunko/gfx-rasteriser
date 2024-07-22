@@ -127,6 +127,15 @@ is
 
    function Ceiling_Minus_Delta (Item : Fixed_16) return Fixed_16;
 
+   function Pixel_Lower_Bound (Item : Fixed_16) return Fixed_16;
+
+   function Pixel_Upper_Bound (Item : Fixed_16) return Fixed_16;
+
+   procedure Pixel_Bounds
+     (Item  : Fixed_16;
+      Lower : out Fixed_16;
+      Upper : out Fixed_16);
+
    function Multiply_Coverage
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
    --  Multiply two given fixed point values and return result rounded toward

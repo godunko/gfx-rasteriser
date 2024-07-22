@@ -1013,6 +1013,8 @@ package body GFX.Rasteriser.Primitives is
          Pixel_Right    : Fixed_16;
          Pixel_Coverage : Fixed_16;
 
+         Clip_Bottom : Fixed_16;
+
       begin
          --  Compute vertcies of the rectangle to be rasterized.
 
@@ -1082,8 +1084,11 @@ package body GFX.Rasteriser.Primitives is
          --  Compute intersection of the current left and right lines with up
          --  and down edges of the device pixel.
 
-         Row_Top    := Floor (Top_Vertex_Y);
-         Row_Bottom := Row_Top + One - Fixed_16_Delta_Fixed;
+         Row_Top    := Pixel_Lower_Bound (Top_Vertex_Y);
+         Row_Bottom := Pixel_Upper_Bound (Top_Vertex_Y);
+
+         Clip_Bottom :=
+           Min (Rendering_Area_Bottom, Pixel_Upper_Bound (Bottom_Vertex_Y));
 
          Left_Edge_Row_Up         :=
            Left_Vertex_X - (Left_Vertex_Y - Row_Top) * Left_Slope_X;
@@ -1095,7 +1100,7 @@ package body GFX.Rasteriser.Primitives is
            Right_Vertex_X - (Right_Vertex_Y - Row_Bottom) * Right_Slope_X;
 
          loop
-            Row_Bottom := Row_Top + One - Fixed_16_Delta_Fixed;
+            Row_Bottom := Pixel_Upper_Bound (Row_Top);
 
             --  Rasterline's span is divided into up to three segments:
             --   - intersection with the left edge line
@@ -1300,7 +1305,7 @@ package body GFX.Rasteriser.Primitives is
                Pixel_Right              := @ + One;
             end loop;
 
-            exit when Row_Top = Floor (Bottom_Vertex_Y + One);
+            exit when Row_Bottom = Clip_Bottom;
 
             --  Compute data for the next iteration
 

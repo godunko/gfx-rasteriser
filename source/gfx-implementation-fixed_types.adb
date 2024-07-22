@@ -147,7 +147,7 @@ package body GFX.Implementation.Fixed_Types is
 
    function Ceiling_Minus_Delta (Item : Fixed_16) return Fixed_16 is
    begin
-      return To_Fixed_16 (To_Unsigned (Item) or 16#FFFF#);
+      return To_Fixed_16 (To_Unsigned (Item) or Fixed_16_Scale_Mask);
    end Ceiling_Minus_Delta;
 
    ----------------------------
@@ -224,7 +224,7 @@ package body GFX.Implementation.Fixed_Types is
 
    function Floor (Item : Fixed_16) return Fixed_16 is
    begin
-      return To_Fixed_16 (To_Unsigned (Item) and not 16#FFFF#);
+      return To_Fixed_16 (To_Unsigned (Item) and not Fixed_16_Scale_Mask);
    end Floor;
 
    ----------------
@@ -335,6 +335,19 @@ package body GFX.Implementation.Fixed_Types is
       end if;
    end Multiply_Saturated;
 
+   ------------------
+   -- Pixel_Bounds --
+   ------------------
+
+   procedure Pixel_Bounds
+     (Item  : Fixed_16;
+      Lower : out Fixed_16;
+      Upper : out Fixed_16) is
+   begin
+      Lower := Pixel_Lower_Bound (Item);
+      Upper := Pixel_Upper_Bound (Item);
+   end Pixel_Bounds;
+
    -----------------------
    -- Pixel_Lower_Bound --
    -----------------------
@@ -346,6 +359,15 @@ package body GFX.Implementation.Fixed_Types is
    end Pixel_Lower_Bound;
 
    -----------------------
+   -- Pixel_Lower_Bound --
+   -----------------------
+
+   function Pixel_Lower_Bound (Item : Fixed_16) return Fixed_16 is
+   begin
+      return To_Fixed_16 (To_Unsigned (Item) and not Fixed_16_Scale_Mask);
+   end Pixel_Lower_Bound;
+
+   -----------------------
    -- Pixel_Upper_Bound --
    -----------------------
 
@@ -354,6 +376,15 @@ package body GFX.Implementation.Fixed_Types is
    begin
       return
         Fixed_16 (Item * GX_Integer (Fixed_16_Scale_I) + Fixed_16_Scale_Mask);
+   end Pixel_Upper_Bound;
+
+   -----------------------
+   -- Pixel_Upper_Bound --
+   -----------------------
+
+   function Pixel_Upper_Bound (Item : Fixed_16) return Fixed_16 is
+   begin
+      return To_Fixed_16 (To_Unsigned (Item) or Fixed_16_Scale_Mask);
    end Pixel_Upper_Bound;
 
    --------------------
