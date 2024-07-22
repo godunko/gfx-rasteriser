@@ -11,4 +11,4 @@ to do next stage of the processing, like color scaling and blending.
 
 Right now it supports rasterization of the thick lines with anitialiasing.
 
-Use case of this module can be found in [GFX sandbox](https://github.com/godunko/gfx-sandbox).
+Some examples (and screenshots) can be found in [GFX Sandbox](https://github.com/godunko/gfx-sandbox).
