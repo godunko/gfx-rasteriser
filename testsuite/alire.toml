@@ -16,7 +16,7 @@ generate_c = false
 generate_gpr = true
 
 [[depends-on]]
-gfx_drawing = "*"
+gfx_rasteriser = "*"
 
 [[pins]]
-gfx_drawing = { path='..' }
+gfx_rasteriser = { path='..' }

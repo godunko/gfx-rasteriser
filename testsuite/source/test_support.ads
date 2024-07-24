@@ -4,24 +4,24 @@
 --  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 --
 
-with GFX.Drawing;
+with GFX.Rasteriser;
 
 package Test_Support is
 
    Green : constant GFX.RGBA8888;
 
    procedure Print_Span
-     (X         : GFX.Drawing.Device_Pixel_Index;
-      Y         : GFX.Drawing.Device_Pixel_Index;
-      Width     : GFX.Drawing.Device_Pixel_Count;
-      Luminance : GFX.Drawing.Grayscale);
+     (X         : GFX.Rasteriser.Device_Pixel_Index;
+      Y         : GFX.Rasteriser.Device_Pixel_Index;
+      Width     : GFX.Rasteriser.Device_Pixel_Count;
+      Luminance : GFX.Rasteriser.Grayscale);
    --  Output span's information to standard output stream.
 
    procedure Set_PPM_Span
-     (X         : GFX.Drawing.Device_Pixel_Index;
-      Y         : GFX.Drawing.Device_Pixel_Index;
-      Width     : GFX.Drawing.Device_Pixel_Count;
-      Luminance : GFX.Drawing.Grayscale);
+     (X         : GFX.Rasteriser.Device_Pixel_Index;
+      Y         : GFX.Rasteriser.Device_Pixel_Index;
+      Width     : GFX.Rasteriser.Device_Pixel_Count;
+      Luminance : GFX.Rasteriser.Grayscale);
    --  Fill PPM according to given information, without blending.
 
 private

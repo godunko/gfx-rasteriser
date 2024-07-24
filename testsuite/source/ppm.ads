@@ -6,25 +6,25 @@
 
 --  Draw into PPM (portable pixmap format) image and save it in file.
 
-with GFX.Drawing;
+with GFX.Rasteriser;
 
 package PPM is
 
    procedure Initialize
-     (Width  : GFX.Drawing.Device_Pixel_Count;
-      Height : GFX.Drawing.Device_Pixel_Count;
+     (Width  : GFX.Rasteriser.Device_Pixel_Count;
+      Height : GFX.Rasteriser.Device_Pixel_Count;
       Color  : GFX.RGBA8888 := GFX.To_RGBA (0, 0, 0, 0));
 
    procedure Finalize;
 
    procedure Set_Pixel
-     (X     : GFX.Drawing.Device_Pixel_Index;
-      Y     : GFX.Drawing.Device_Pixel_Index;
+     (X     : GFX.Rasteriser.Device_Pixel_Index;
+      Y     : GFX.Rasteriser.Device_Pixel_Index;
       Color : GFX.RGBA8888);
 
    function Get_Pixel
-     (X : GFX.Drawing.Device_Pixel_Index;
-      Y : GFX.Drawing.Device_Pixel_Index) return GFX.RGBA8888;
+     (X : GFX.Rasteriser.Device_Pixel_Index;
+      Y : GFX.Rasteriser.Device_Pixel_Index) return GFX.RGBA8888;
 
    procedure Save (File_Name : String);
 

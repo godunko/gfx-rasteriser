@@ -12,20 +12,20 @@ with PPM;
 
 package body Test_Support is
 
-   use type GFX.Drawing.Device_Pixel_Index;
+   use type GFX.Rasteriser.Device_Pixel_Index;
 
-   Current_Y : GFX.Drawing.Device_Pixel_Index :=
-     GFX.Drawing.Device_Pixel_Index'First;
+   Current_Y : GFX.Rasteriser.Device_Pixel_Index :=
+     GFX.Rasteriser.Device_Pixel_Index'First;
 
    ------------------
    -- Set_PPM_Span --
    ------------------
 
    procedure Set_PPM_Span
-     (X         : GFX.Drawing.Device_Pixel_Index;
-      Y         : GFX.Drawing.Device_Pixel_Index;
-      Width     : GFX.Drawing.Device_Pixel_Count;
-      Luminance : GFX.Drawing.Grayscale)
+     (X         : GFX.Rasteriser.Device_Pixel_Index;
+      Y         : GFX.Rasteriser.Device_Pixel_Index;
+      Width     : GFX.Rasteriser.Device_Pixel_Count;
+      Luminance : GFX.Rasteriser.Grayscale)
    is
       Color : constant GFX.RGBA8888 :=
         GFX.To_RGBA (R => Luminance, G => Luminance, B => Luminance, A => 255);
@@ -41,24 +41,24 @@ package body Test_Support is
    ----------------
 
    procedure Print_Span
-     (X         : GFX.Drawing.Device_Pixel_Index;
-      Y         : GFX.Drawing.Device_Pixel_Index;
-      Width     : GFX.Drawing.Device_Pixel_Count;
-      Luminance : GFX.Drawing.Grayscale) is
+     (X         : GFX.Rasteriser.Device_Pixel_Index;
+      Y         : GFX.Rasteriser.Device_Pixel_Index;
+      Width     : GFX.Rasteriser.Device_Pixel_Count;
+      Luminance : GFX.Rasteriser.Grayscale) is
    begin
       if Y /= Current_Y then
          Current_Y := Y;
          New_Line;
-         Put (Trim (GFX.Drawing.Device_Pixel_Index'Image (Y), Both));
+         Put (Trim (GFX.Rasteriser.Device_Pixel_Index'Image (Y), Both));
          Put (":");
       end if;
 
       Put ("  ");
-      Put (Trim (GFX.Drawing.Device_Pixel_Index'Image (X), Both));
+      Put (Trim (GFX.Rasteriser.Device_Pixel_Index'Image (X), Both));
       Put ('/');
-      Put (Trim (GFX.Drawing.Device_Pixel_Index'Image (Width), Both));
+      Put (Trim (GFX.Rasteriser.Device_Pixel_Index'Image (Width), Both));
       Put (" [");
-      Put (Trim (GFX.Drawing.Grayscale'Image (Luminance), Both));
+      Put (Trim (GFX.Rasteriser.Grayscale'Image (Luminance), Both));
       Put (']');
    end Print_Span;
 

@@ -14,8 +14,8 @@ with Interfaces;
 package body PPM is
 
    type Raster is
-     array (GFX.Drawing.Device_Pixel_Count range <>,
-            GFX.Drawing.Device_Pixel_Count range <>)
+     array (GFX.Rasteriser.Device_Pixel_Count range <>,
+            GFX.Rasteriser.Device_Pixel_Count range <>)
        of GFX.RGBA8888;
 
    type Raster_Access is access all Raster;
@@ -35,8 +35,8 @@ package body PPM is
    ---------------
 
    function Get_Pixel
-     (X : GFX.Drawing.Device_Pixel_Index;
-      Y : GFX.Drawing.Device_Pixel_Index) return GFX.RGBA8888 is
+     (X : GFX.Rasteriser.Device_Pixel_Index;
+      Y : GFX.Rasteriser.Device_Pixel_Index) return GFX.RGBA8888 is
    begin
       return Buffer (X, Y);
    end Get_Pixel;
@@ -46,11 +46,11 @@ package body PPM is
    ----------------
 
    procedure Initialize
-     (Width  : GFX.Drawing.Device_Pixel_Count;
-      Height : GFX.Drawing.Device_Pixel_Count;
+     (Width  : GFX.Rasteriser.Device_Pixel_Count;
+      Height : GFX.Rasteriser.Device_Pixel_Count;
       Color  : GFX.RGBA8888 := GFX.To_RGBA (0, 0, 0, 0))
    is
-      use type GFX.Drawing.Device_Pixel_Count;
+      use type GFX.Rasteriser.Device_Pixel_Count;
 
    begin
       Buffer := new Raster (0 .. Width - 1, 0 .. Height - 1);
@@ -66,11 +66,11 @@ package body PPM is
 
       W : constant String :=
         Ada.Strings.Fixed.Trim
-          (GFX.Drawing.Device_Pixel_Count'Image (Buffer'Length (1)),
+          (GFX.Rasteriser.Device_Pixel_Count'Image (Buffer'Length (1)),
            Ada.Strings.Both);
       H : constant String :=
         Ada.Strings.Fixed.Trim
-          (GFX.Drawing.Device_Pixel_Count'Image (Buffer'Length (2)),
+          (GFX.Rasteriser.Device_Pixel_Count'Image (Buffer'Length (2)),
            Ada.Strings.Both);
 
    begin
@@ -125,8 +125,8 @@ package body PPM is
    ---------------
 
    procedure Set_Pixel
-     (X     : GFX.Drawing.Device_Pixel_Index;
-      Y     : GFX.Drawing.Device_Pixel_Index;
+     (X     : GFX.Rasteriser.Device_Pixel_Index;
+      Y     : GFX.Rasteriser.Device_Pixel_Index;
       Color : GFX.RGBA8888) is
    begin
       Buffer (X, Y) := Color;
