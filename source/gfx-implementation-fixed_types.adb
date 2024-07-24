@@ -13,8 +13,7 @@ package body GFX.Implementation.Fixed_Types is
    use Interfaces;
 
    Fixed_6_Scale       : constant := 2.0 ** 6;
-   Fixed_16_Scale      : constant := 2.0 ** 16;
-   Fixed_16_Offset     : constant := -(2.0 ** 15);
+   Fixed_16_Scale_R    : constant := 2.0 ** 16;
    Fixed_16_Scale_I    : constant := 2 ** 16;
    Fixed_16_Scale_Mask : constant := 2 ** 16 - 1;
    Fixed_6_16_Scale    : constant GX_Integer := 2 ** 10;
@@ -387,6 +386,16 @@ package body GFX.Implementation.Fixed_Types is
       return To_Fixed_16 (2**16 - (To_Unsigned (Item) and 16#FFFF#));
    end Right_Coverage;
 
+   ---------------------------
+   -- Snap_To_Subpixel_Grid --
+   ---------------------------
+
+   function Snap_To_Subpixel_Grid
+     (Item : GFX.Rasteriser.Device_Pixel_Coordinate) return Fixed_16 is
+   begin
+      return To_Fixed_16 (To_Fixed_6 (Item));
+   end Snap_To_Subpixel_Grid;
+
    ----------------
    -- To_Fixed_6 --
    ----------------
@@ -396,16 +405,6 @@ package body GFX.Implementation.Fixed_Types is
    begin
       return Fixed_6 (Item * Fixed_6_Scale);
    end To_Fixed_6;
-
-   -----------------
-   -- To_Fixed_16 --
-   -----------------
-
-   function To_Fixed_16
-     (Item : GFX.Rasteriser.Device_Pixel_Coordinate) return Fixed_16 is
-   begin
-      return Fixed_16 (Item * Fixed_16_Scale - Fixed_16_Offset);
-   end To_Fixed_16;
 
    -----------------
    -- To_Fixed_16 --

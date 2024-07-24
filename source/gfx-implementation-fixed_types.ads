@@ -81,7 +81,7 @@ is
    --  ??? Float->Integer conversion is expensive on ARMv7M, can it be
    --  optimized ???
 
-   function To_Fixed_16
+   function Snap_To_Subpixel_Grid
      (Item : GFX.Rasteriser.Device_Pixel_Coordinate) return Fixed_16;
    --  Convert given floating point value to binary fixed point value with 16
    --  bits of precision with the coordinate system offset.

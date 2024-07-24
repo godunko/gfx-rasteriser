@@ -102,19 +102,19 @@ package body GFX.Rasteriser.Primitives is
          Width    : GFX.Rasteriser.Device_Pixel_Count;
          Coverage : GFX.Rasteriser.Grayscale))
    is
-      T  : constant Fixed_16   := To_Fixed_16 (Top);
+      T  : constant Fixed_16   := Snap_To_Subpixel_Grid (Top);
       TI : constant GX_Integer := Integral (T);
       TC : constant Fixed_16   := Right_Coverage (T);
 
-      L  : constant Fixed_16   := To_Fixed_16 (Left);
+      L  : constant Fixed_16   := Snap_To_Subpixel_Grid (Left);
       LI : constant GX_Integer := Integral (L);
       LC : constant Fixed_16   := Right_Coverage (L);
 
-      R  : constant Fixed_16   := To_Fixed_16 (Right);
+      R  : constant Fixed_16   := Snap_To_Subpixel_Grid (Right);
       RI : constant GX_Integer := Integral (R);
       RC : constant Fixed_16   := Left_Coverage (R);
 
-      B  : constant Fixed_16   := To_Fixed_16 (Bottom);
+      B  : constant Fixed_16   := Snap_To_Subpixel_Grid (Bottom);
       BI : constant GX_Integer := Integral (B);
       BC : constant Fixed_16   := Left_Coverage (B);
 
