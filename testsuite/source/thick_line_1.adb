@@ -11,6 +11,8 @@ with Test_Support;
 
 procedure Thick_Line_1 is
 begin
+   GFX.Rasteriser.Primitives.Set_Rendering_Area (0, 0, 20, 20);
+
    GFX.Rasteriser.Primitives.Rasterize_Line
      ((5.0, 5.0), (15.0, 15.0), 2.0, Test_Support.Print_Span'Access);
 
