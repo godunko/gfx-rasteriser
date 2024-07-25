@@ -28,6 +28,8 @@ is
    Zero                 : constant Fixed_16;
    One                  : constant Fixed_16;
    Fixed_16_Delta_Fixed : constant Fixed_16;
+   Fixed_16_First       : constant Fixed_16;
+   Fixed_16_Last        : constant Fixed_16;
 
    Fixed_16_Delta : constant := 1.0 / (2.0 ** 16);
 
@@ -155,5 +157,7 @@ private
    Zero                 : constant Fixed_16 := 0;
    One                  : constant Fixed_16 := 2**16;
    Fixed_16_Delta_Fixed : constant Fixed_16 := 1;
+   Fixed_16_First       : constant Fixed_16 := Fixed_16'First;
+   Fixed_16_Last        : constant Fixed_16 := Fixed_16'Last;
 
 end GFX.Implementation.Fixed_Types;

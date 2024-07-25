@@ -8,12 +8,14 @@ pragma Restrictions (No_Elaboration_Code);
 
 pragma Ada_2022;
 
+with GFX.Implementation.Clipping;
 with GFX.Implementation.Fixed_Types;
 with GFX.Vectors;
 
 package body GFX.Rasteriser.Primitives is
 
    use Interfaces;
+   use GFX.Implementation.Clipping;
    use GFX.Implementation.Fixed_Types;
    use GFX.Points;
    use GFX.Vectors;
@@ -81,10 +83,7 @@ package body GFX.Rasteriser.Primitives is
       Right_Edge_Slope_Y         : Fixed_16;
       Luminance                  : in out Fixed_16);
 
-   Rendering_Area_Top    : Fixed_16;
-   Rendering_Area_Left   : Fixed_16;
-   Rendering_Area_Right  : Fixed_16;
-   Rendering_Area_Bottom : Fixed_16;
+   Rendering_Area : GFX.Implementation.Clipping.Rendering_Area;
    --  Bound of the rendering area
 
    -----------------------------
@@ -1082,7 +1081,7 @@ package body GFX.Rasteriser.Primitives is
          Right_Slope_Y := Top_Right_Slope_Y;
 
          Clip_Bottom :=
-           Min (Rendering_Area_Bottom, Pixel_Upper_Bound (Bottom_Vertex_Y));
+           Min (Y_Max (Rendering_Area), Pixel_Upper_Bound (Bottom_Vertex_Y));
 
          Row_Top    := Pixel_Lower_Bound (Top_Vertex_Y);
          Row_Bottom := Pixel_Upper_Bound (Top_Vertex_Y);
@@ -1356,10 +1355,12 @@ package body GFX.Rasteriser.Primitives is
       Right  : GFX.Rasteriser.Device_Pixel_Index;
       Bottom : GFX.Rasteriser.Device_Pixel_Index) is
    begin
-      Rendering_Area_Left   := Pixel_Lower_Bound (Left);
-      Rendering_Area_Right  := Pixel_Upper_Bound (Right);
-      Rendering_Area_Top    := Pixel_Lower_Bound (Top);
-      Rendering_Area_Bottom := Pixel_Upper_Bound (Bottom);
+      Set_Rendering_Area
+        (Self  => Rendering_Area,
+         X_Min => Left,
+         X_Max => Right,
+         Y_Min => Top,
+         Y_Max => Bottom);
    end Set_Rendering_Area;
 
 end GFX.Rasteriser.Primitives;
