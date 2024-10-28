@@ -24,6 +24,7 @@
 --  Relationship between these types is presented below.
 --
 --  16bit binary precision      |0                             65535|
+--  6bit binary precision       |0                                63|
 --  device pixel index          |                 0                 |
 --  64x64 subpixel index        |-32|-31|...| -1| 0 | 1 |...| 30| 31|
 --  device pixel coordinate  [-0.5               0.0               0.5)
