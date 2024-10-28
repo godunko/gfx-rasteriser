@@ -222,8 +222,10 @@ package body GFX.Rasteriser.CSS_Borders is
       SCL : Grid_Coordinate;
       SCR : Grid_Coordinate;
 
-      EIL : Grid_Coordinate with Export;
-      EIR : Grid_Coordinate with Export;
+      ELL : Grid_Coordinate with Export;
+      ELR : Grid_Coordinate with Export;
+      ERL : Grid_Coordinate with Export;
+      ERR : Grid_Coordinate with Export;
       CAR : Grid_Coordinate with Export;
       CAL : Grid_Coordinate with Export;
 
@@ -263,6 +265,20 @@ package body GFX.Rasteriser.CSS_Borders is
          Inverse_X         => True,
          Inverse_Y         => True);
 
+      ETR :=
+        (Center_X          =>
+           Snap_To_Grid (Border.Edge.Right)
+             - Length_To_Grid (Border.Top_Right_Radius.Horizontal),
+         Center_Y          =>
+           Snap_To_Grid (Border.Edge.Top)
+             + Length_To_Grid (Border.Top_Right_Radius.Vertical),
+         Horizontal_Radius =>
+           Length_To_Grid (Border.Top_Right_Radius.Horizontal),
+         Vertical_Radius   =>
+           Length_To_Grid (Border.Top_Right_Radius.Vertical),
+         Inverse_X         => False,
+         Inverse_Y         => True);
+
       X := Snap_To_Grid (Border.Edge.Left) + Grid_One;
       Y := Snap_To_Grid (Border.Edge.Top) + Grid_One;
 
@@ -282,35 +298,40 @@ package body GFX.Rasteriser.CSS_Borders is
 
       Accumulated := 0;
 
-      --  S  := Device_Pixel (Snap_To_Grid (Border.Edge.Top));
       SR  := Device_Pixel (BT);
       SRT := Lower (SR);
-      SRB := Upper (SR);
+      SRB := SRT + Grid_One;
 
-      EIL := Coordinate_X (ETL, SRB + 1);
-      EIR := Coordinate_X (ETL, BT);
+      ELL := Coordinate_X (ETL, SRB);
+      ELR := Coordinate_X (ETL, BT);
+      ERL := Coordinate_X (ETR, BT);
+      ERR := Coordinate_X (ETR, SRB);
 
-      SC  := Device_Pixel (EIL);
+      SC  := Device_Pixel (ELL);
       SCL := Lower (SC);
       SCR := SCL + Grid_One;
 
+      --  First pixel, ellipse
+
       CAR := Coordinate_Y (ETL, SCR);
 
-      Coverage    := GX_Integer (SRB + 1 - CAR);
-      Area        := GX_Integer ((EIL + 1 - SCL) + Grid_One) * Coverage;
+      Coverage    := GX_Integer (SRB - CAR);
+      Area        := GX_Integer ((ELL - SCL) + Grid_One) * Coverage;
       Accumulated := @ + Coverage;
 
-      Gray := Grid_One / Accumulated + Area / 2;
-      Gray := @ / Grid_One;
+      Gray := Grid_One * Accumulated - Area / 2;
+      Gray := @ * 255 / (Grid_One * Grid_One);
 
       Fill_Span (SC, SR, 1, Grayscale (Gray));
 
-      loop
-         SC  := @ + 1;
-         SCL := @ + Grid_One;
-         SCR := @ + Grid_One;
+      SC  := @ + 1;
+      SCL := @ + Grid_One;
+      SCR := @ + Grid_One;
 
-         exit when SCR > EIR;
+      --  Continuation of the ellipse
+
+      loop
+         exit when SCR > ELR;
 
          CAL := CAR;
          CAR := Coordinate_Y (ETL, SCR);
@@ -323,6 +344,218 @@ package body GFX.Rasteriser.CSS_Borders is
          Gray := @ * 255 / (Grid_One * Grid_One);
 
          Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+         SC  := @ + 1;
+         SCL := @ + Grid_One;
+         SCR := @ + Grid_One;
+      end loop;
+
+      --  Ellipse and top line intersection pixel
+
+      CAL := CAR;
+
+      Coverage    := GX_Integer (CAL - BT);
+      Area        := GX_Integer (ELR + 1 - SCL) * Coverage;
+      Accumulated := @ + Coverage;
+
+      Gray := Grid_One * Accumulated - Area / 2;
+      Gray := @ * 255 / (Grid_One * Grid_One);
+
+      Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+      SC  := @ + 1;
+      SCL := @ + Grid_One;
+      SCR := @ + Grid_One;
+
+      --  Top line
+
+      loop
+         exit when SCR > ERL;
+
+         Area := 0;
+         Gray := Grid_One * Accumulated - Area / 2;
+         Gray := @ * 255 / (Grid_One * Grid_One);
+
+         Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+         SC  := @ + 1;
+         SCL := @ + Grid_One;
+         SCR := @ + Grid_One;
+      end loop;
+
+      --  Top line and top-right ellipse intersection
+
+      CAR := Coordinate_Y (ETR, SCR);
+
+      Coverage    := GX_Integer (BT - CAR);
+      Area        := (GX_Integer (ERL + 1 - SCL) + Grid_One) * Coverage;
+      Accumulated := @ + Coverage;
+
+      Gray := Grid_One * Accumulated - Area / 2;
+      Gray := @ * 255 / (Grid_One * Grid_One);
+
+      Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+      SC  := @ + 1;
+      SCL := @ + Grid_One;
+      SCR := @ + Grid_One;
+
+      loop
+         exit when SCR > ERR;
+
+         CAL := CAR;
+         CAR := Coordinate_Y (ETR, SCR);
+
+         Coverage    := GX_Integer (CAL - CAR);
+         Area        := Grid_One * Coverage;
+         Accumulated := @ + Coverage;
+
+         Gray := Grid_One * Accumulated - Area / 2;
+         Gray := @ * 255 / (Grid_One * Grid_One);
+
+         Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+         SC  := @ + 1;
+         SCL := @ + Grid_One;
+         SCR := @ + Grid_One;
+      end loop;
+
+      CAL := CAR;
+      Coverage    := GX_Integer (CAL - (SRB));
+      Area        := GX_Integer (ERR - SCL) * Coverage;
+      Accumulated := @ + Coverage;
+
+      Gray := Grid_One * Accumulated - Area / 2;
+      Gray := @ * 255 / (Grid_One * Grid_One);
+
+      Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+      --  Vertical part of the top corner's ellipse
+
+      SR  := @ + 1;
+      SRT := @ + Grid_One;
+      SRB := @ + Grid_One;
+      Accumulated := 0;
+
+      loop
+         ELR := ELL;
+         ELL := Coordinate_X (ETL, SRB);
+         ERL := ERR;
+         ERR := Coordinate_X (ETR, SRB);
+
+         SC  := Device_Pixel (ELL);
+         SCL := Lower (SC);
+         SCR := SCL + Grid_One;
+
+         --  First pixel, ellipse
+
+         CAR := Coordinate_Y (ETL, SCR);
+
+         Coverage    := GX_Integer (SRB - CAR);
+         Area        := GX_Integer ((ELL - SCL) + Grid_One) * Coverage;
+         Accumulated := @ + Coverage;
+
+         Gray := Grid_One * Accumulated - Area / 2;
+         Gray := @ * 255 / (Grid_One * Grid_One);
+
+         Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+         SC  := @ + 1;
+         SCL := @ + Grid_One;
+         SCR := @ + Grid_One;
+
+         --  Continuation of the ellipse
+
+         loop
+            exit when ELR <= SCL;
+
+            CAL := CAR;
+            CAR := Coordinate_Y (ETL, SCR);
+
+            if SCR < ELR then
+               Coverage    := GX_Integer (CAL - CAR);
+               Area        := Grid_One * Coverage;
+               Accumulated := @ + Coverage;
+
+            else
+               Coverage    := GX_Integer (CAL - SRT);
+               Area        := GX_Integer (ELR - SCL) * Coverage;
+               Accumulated := @ + Coverage;
+            end if;
+
+            Gray := Grid_One * Accumulated - Area / 2;
+            Gray := @ * 255 / (Grid_One * Grid_One);
+
+            Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+            SC  := @ + 1;
+            SCL := @ + Grid_One;
+            SCR := @ + Grid_One;
+         end loop;
+
+         --  Inner area
+
+         loop
+            exit when SCR > ERL;
+
+            Area := 0;
+            Gray := Grid_One * Accumulated - Area / 2;
+            Gray := @ * 255 / (Grid_One * Grid_One);
+
+            --  XXX Grayscale should be 255 always!
+
+            Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+            SC  := @ + 1;
+            SCL := @ + Grid_One;
+            SCR := @ + Grid_One;
+         end loop;
+
+         --  First pixel of the top right ellipse at current scanline
+
+         CAR := Coordinate_Y (ETR, SCR);
+
+         Coverage    := GX_Integer (SRT - CAR);
+         Area        := GX_Integer (ERL - SCL + Grid_One) * Coverage;
+         Accumulated := @ + Coverage;
+
+         Gray := Grid_One * Accumulated - Area / 2;
+         Gray := @ * 255 / (Grid_One * Grid_One);
+
+         Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+         SC  := @ + 1;
+         SCL := @ + Grid_One;
+         SCR := @ + Grid_One;
+
+         loop
+            exit when ERR <= SCL;
+
+            CAL := CAR;
+            CAR := Coordinate_Y (ETR, SCR);
+
+            if SCR < ERR then
+               Coverage    := GX_Integer (CAL - CAR);
+               Area        := Grid_One * Coverage;
+               Accumulated := @ + Coverage;
+
+            else
+               Coverage    := GX_Integer (CAL - SRB);
+               Area        := GX_Integer (ERR - SCL) * Coverage;
+               Accumulated := @ + Coverage;
+            end if;
+
+            Gray := Grid_One * Accumulated - Area / 2;
+            Gray := @ * 255 / (Grid_One * Grid_One);
+
+            Fill_Span (SC, SR, 1, Grayscale (Gray));
+
+            SC  := @ + 1;
+            SCL := @ + Grid_One;
+            SCR := @ + Grid_One;
+         end loop;
+
+         exit;
       end loop;
 
       --  Fill_Span
