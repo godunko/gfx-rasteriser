@@ -193,14 +193,187 @@ package body GFX.Rasteriser.CSS_Borders is
          Width    : GFX.Rasteriser.Device_Pixel_Count;
          Coverage : GFX.Rasteriser.Grayscale))
    is
+
+      procedure TL
+        (ST          : Grid_Coordinate;  --  Scanline cell top
+         SR          : Grid_Coordinate;  --                right
+         SB          : Grid_Coordinate;  --                bottom
+         SL          : Grid_Coordinate;  --                left
+         ET          : Grid_Coordinate;  --  Edge at top
+         ER          : Grid_Coordinate;  --          right
+         EB          : Grid_Coordinate;  --          bottom
+         EL          : Grid_Coordinate;  --          left
+         Area        : out GX_Integer;
+         Coverage : in out GX_Integer);
+
+      --------
+      -- TL --
+      --------
+
+      procedure TL
+        (ST          : Grid_Coordinate;  --  Scanline cell top
+         SR          : Grid_Coordinate;  --                right
+         SB          : Grid_Coordinate;  --                bottom
+         SL          : Grid_Coordinate;  --                left
+         ET          : Grid_Coordinate;  --  Edge at top
+         ER          : Grid_Coordinate;  --          right
+         EB          : Grid_Coordinate;  --          bottom
+         EL          : Grid_Coordinate;  --          left
+         Area        : out GX_Integer;
+         Coverage : in out GX_Integer)
+      is
+         Height : GX_Integer;
+
+      begin
+         if ER < ST then
+            --  Crossing top side of the scanline cell
+
+            if EL < ST then
+               --  Crossing top side of the scanline cell
+
+               raise Program_Error;
+
+            elsif EL <= SB then
+               --  Crossing left side of the scanline cell
+
+               Height := GX_Integer (EL - ST);
+               Area   := GX_Integer (ET - SL) * Height;
+
+            else
+               --  Crossing bottom side of the scanline cell
+
+               Height := Grid_One;
+               Area   := GX_Integer ((ET - SL) + (EB - SL)) * Height;
+            end if;
+
+         elsif ER <= SB then
+            --  Crossing right side of the scanline cell
+
+            if EL < ST then
+               --  Crossing top side of the scanline cell
+
+               raise Program_Error;
+
+            elsif EL <= SB then
+               --  Crossing left side of the scanline cell
+
+               Height := GX_Integer (EL - ER);
+               Area   := Grid_One * Height;
+
+            else
+               --  Crossing bottom side of the scanline cell
+
+               Height := GX_Integer (SB - ER);
+               Area   := (GX_Integer (EB - SL) + Grid_One) * Height;
+            end if;
+
+         else
+            --  Crossing bottom side of the scanline cell
+
+            raise Program_Error;
+         end if;
+
+         Coverage := @ + Height;
+      end TL;
+
+      --------
+      -- TR --
+      --------
+
+      procedure TR
+        (ST          : Grid_Coordinate;  --  Scanline cell top
+         SR          : Grid_Coordinate;  --                right
+         SB          : Grid_Coordinate;  --                bottom
+         SL          : Grid_Coordinate;  --                left
+         ET          : Grid_Coordinate;  --  Edge at top
+         ER          : Grid_Coordinate;  --          right
+         EB          : Grid_Coordinate;  --          bottom
+         EL          : Grid_Coordinate;  --          left
+         Area        : out GX_Integer;
+         Coverage : in out GX_Integer)
+      is
+         Height : GX_Integer;
+
+      begin
+         if ER < ST then
+            --  Crossing top side of the scanline cell
+
+            if EL < ST then
+               --  Crossing top side of the scanline cell
+
+               raise Program_Error;
+
+            elsif EL <= SB then
+               --  Crossing left side of the scanline cell
+
+               --  Height := GX_Integer (EL - ST);
+               --  Area   := GX_Integer (ET - SL) * Height;
+               raise Program_Error;
+
+            else
+               --  Crossing bottom side of the scanline cell
+
+               --  Height := Grid_One;
+               --  Area   := GX_Integer ((ET - SL) + (EB - SL)) * Height;
+               raise Program_Error;
+            end if;
+
+         elsif ER <= SB then
+            --  Crossing right side of the scanline cell
+
+            if EL < ST then
+               --  Crossing top side of the scanline cell
+
+               Height := -GX_Integer (ER - ST);
+               Area   := GX_Integer (ET - SL + Grid_One) * Height;
+
+            elsif EL <= SB then
+               --  Crossing left side of the scanline cell
+
+               Height := GX_Integer (EL - ER);
+               Area   := Grid_One * Height;
+
+            else
+               --  Crossing bottom side of the scanline cell
+
+               --  Height := GX_Integer (SB - ER);
+               --  Area   := (GX_Integer (EB - SL) + Grid_One) * Height;
+               raise Program_Error;
+            end if;
+
+         else
+            --  Crossing bottom side of the scanline cell
+
+            if EL < ST then
+               --  Crossing top side of the scanline cell
+
+               Height := -Grid_One;
+               Area   := GX_Integer ((ET - SL) + (EB - SL)) * Height;
+
+            elsif EL <= SB then
+               --  Crossing left side of the scanline cell
+
+               Height := -GX_Integer (SB - EL);
+               Area   := GX_Integer (EB - SL) * Height;
+
+            else
+               --  Crossing bottom side of the scanline cell
+
+               raise Program_Error;
+            end if;
+         end if;
+
+         Coverage := @ + Height;
+      end TR;
+
       --  BT : F_18_6 := F_18_6 (Border.Edge.Top);
       --  BR : F_18_6 := F_18_6 (Border.Edge.Right);
       --  BB : F_18_6 := F_18_6 (Border.Edge.Bottom);
       --  BL : F_18_6 := F_18_6 (Border.Edge.Left);
-      BT : Grid_Coordinate := Snap_To_Grid (Border.Edge.Top);
-      BR : Grid_Coordinate := Snap_To_Grid (Border.Edge.Right);
-      BB : Grid_Coordinate := Snap_To_Grid (Border.Edge.Bottom);
-      BL : Grid_Coordinate := Snap_To_Grid (Border.Edge.Left);
+      BT : Grid_Coordinate := Snap_To_Grid (Border.Edge.Top) with Export;
+      BR : Grid_Coordinate := Snap_To_Grid (Border.Edge.Right) with Export;
+      BB : Grid_Coordinate := Snap_To_Grid (Border.Edge.Bottom) with Export;
+      BL : Grid_Coordinate := Snap_To_Grid (Border.Edge.Left) with Export;
 
       --  RT : Grid := Grid'Floor (BT);
       --  CL : Grid := Grid'Floor (BR);
@@ -219,8 +392,8 @@ package body GFX.Rasteriser.CSS_Borders is
       SRT : Grid_Coordinate;
       SRB : Grid_Coordinate;
       SC  : Device_Pixel_Index;
-      SCL : Grid_Coordinate;
-      SCR : Grid_Coordinate;
+      SCL : Grid_Coordinate with Export;
+      SCR : Grid_Coordinate with Export;
 
       ELL : Grid_Coordinate with Export;
       ELR : Grid_Coordinate with Export;
@@ -315,9 +488,17 @@ package body GFX.Rasteriser.CSS_Borders is
 
       CAR := Coordinate_Y (ETL, SCR);
 
-      Coverage    := GX_Integer (SRB - CAR);
-      Area        := GX_Integer ((ELL - SCL) + Grid_One) * Coverage;
-      Accumulated := @ + Coverage;
+      TL
+        (ST       => SRT,
+         SR       => SCR,
+         SB       => SRB,
+         SL       => SCL,
+         ET       => Grid_Coordinate'Last,
+         ER       => CAR,
+         EB       => ELL,
+         EL       => Grid_Coordinate'Last,
+         Area     => Area,
+         Coverage => Accumulated);
 
       Gray := Grid_One * Accumulated - Area / 2;
       Gray := @ * 255 / (Grid_One * Grid_One);
@@ -336,9 +517,17 @@ package body GFX.Rasteriser.CSS_Borders is
          CAL := CAR;
          CAR := Coordinate_Y (ETL, SCR);
 
-         Coverage    := GX_Integer (CAL - CAR);
-         Area        := Grid_One * Coverage;
-         Accumulated := @ + Coverage;
+         TL
+           (ST => SRT,
+            SR => SCR,
+            SB => SRB,
+            SL => SCL,
+            ET => Grid_Coordinate'Last,
+            ER => CAR,
+            EB => ELL,
+            EL => CAL,
+            Area      => Area,
+            Coverage => Accumulated);
 
          Gray := Grid_One * Accumulated - Area / 2;
          Gray := @ * 255 / (Grid_One * Grid_One);
@@ -406,9 +595,17 @@ package body GFX.Rasteriser.CSS_Borders is
          CAL := CAR;
          CAR := Coordinate_Y (ETR, SCR);
 
-         Coverage    := GX_Integer (CAL - CAR);
-         Area        := Grid_One * Coverage;
-         Accumulated := @ + Coverage;
+         TR
+           (ST       => SRT,
+            SR       => SCR,
+            SB       => SRB,
+            SL       => SCL,
+            ET       => ERL,
+            ER       => CAR,
+            EB       => ERR,
+            EL       => CAL,
+            Area     => Area,
+            Coverage => Accumulated);
 
          Gray := Grid_One * Accumulated - Area / 2;
          Gray := @ * 255 / (Grid_One * Grid_One);
@@ -437,11 +634,14 @@ package body GFX.Rasteriser.CSS_Borders is
       SRB := @ + Grid_One;
       Accumulated := 0;
 
-      loop
+      Outer: loop
          ELR := ELL;
          ELL := Coordinate_X (ETL, SRB);
          ERL := ERR;
          ERR := Coordinate_X (ETR, SRB);
+
+         exit when SRB > ETL.Center_Y;
+         --  XXX just to prevent exception and failure
 
          SC  := Device_Pixel (ELL);
          SCL := Lower (SC);
@@ -449,11 +649,20 @@ package body GFX.Rasteriser.CSS_Borders is
 
          --  First pixel, ellipse
 
+         CAL := Grid_Coordinate'Last;
          CAR := Coordinate_Y (ETL, SCR);
 
-         Coverage    := GX_Integer (SRB - CAR);
-         Area        := GX_Integer ((ELL - SCL) + Grid_One) * Coverage;
-         Accumulated := @ + Coverage;
+         TL
+           (ST       => SRT,
+            SR       => SCR,
+            SB       => SRB,
+            SL       => SCL,
+            ET       => ELR,
+            ER       => CAR,
+            EB       => ELL,
+            EL       => CAL,
+            Area     => Area,
+            Coverage => Accumulated);
 
          Gray := Grid_One * Accumulated - Area / 2;
          Gray := @ * 255 / (Grid_One * Grid_One);
@@ -472,16 +681,17 @@ package body GFX.Rasteriser.CSS_Borders is
             CAL := CAR;
             CAR := Coordinate_Y (ETL, SCR);
 
-            if SCR < ELR then
-               Coverage    := GX_Integer (CAL - CAR);
-               Area        := Grid_One * Coverage;
-               Accumulated := @ + Coverage;
-
-            else
-               Coverage    := GX_Integer (CAL - SRT);
-               Area        := GX_Integer (ELR - SCL) * Coverage;
-               Accumulated := @ + Coverage;
-            end if;
+            TL
+              (ST       => SRT,
+               SR       => SCR,
+               SB       => SRB,
+               SL       => SCL,
+               ET       => ELR,
+               ER       => CAR,
+               EB       => ELL,
+               EL       => CAL,
+               Area     => Area,
+               Coverage => Accumulated);
 
             Gray := Grid_One * Accumulated - Area / 2;
             Gray := @ * 255 / (Grid_One * Grid_One);
@@ -513,11 +723,24 @@ package body GFX.Rasteriser.CSS_Borders is
 
          --  First pixel of the top right ellipse at current scanline
 
-         CAR := Coordinate_Y (ETR, SCR);
+         CAL := Coordinate_Y (ETR, SCL);
+         --  CAL := Grid_Coordinate'First;
+         CAR :=
+           (if SCR < BR
+              then Coordinate_Y (ETR, SCR)
+              else Grid_Coordinate'Last);
 
-         Coverage    := GX_Integer (SRT - CAR);
-         Area        := GX_Integer (ERL - SCL + Grid_One) * Coverage;
-         Accumulated := @ + Coverage;
+         TR
+           (ST       => SRT,
+            SR       => SCR,
+            SB       => SRB,
+            SL       => SCL,
+            ET       => ERL,
+            ER       => CAR,
+            EB       => ERR,
+            EL       => CAL,
+            Area     => Area,
+            Coverage => Accumulated);
 
          Gray := Grid_One * Accumulated - Area / 2;
          Gray := @ * 255 / (Grid_One * Grid_One);
@@ -532,18 +755,22 @@ package body GFX.Rasteriser.CSS_Borders is
             exit when ERR <= SCL;
 
             CAL := CAR;
-            CAR := Coordinate_Y (ETR, SCR);
+            CAR :=
+              (if SCR < BR
+                 then Coordinate_Y (ETR, SCR)
+                 else Grid_Coordinate'Last);
 
-            if SCR < ERR then
-               Coverage    := GX_Integer (CAL - CAR);
-               Area        := Grid_One * Coverage;
-               Accumulated := @ + Coverage;
-
-            else
-               Coverage    := GX_Integer (CAL - SRB);
-               Area        := GX_Integer (ERR - SCL) * Coverage;
-               Accumulated := @ + Coverage;
-            end if;
+            TR
+              (ST       => SRT,
+               SR       => SCR,
+               SB       => SRB,
+               SL       => SCL,
+               ET       => ERL,
+               ER       => CAR,
+               EB       => ERR,
+               EL       => CAL,
+               Area     => Area,
+               Coverage => Accumulated);
 
             Gray := Grid_One * Accumulated - Area / 2;
             Gray := @ * 255 / (Grid_One * Grid_One);
@@ -555,8 +782,11 @@ package body GFX.Rasteriser.CSS_Borders is
             SCR := @ + Grid_One;
          end loop;
 
-         exit;
-      end loop;
+         SR  := @ + 1;
+         SRT := @ + Grid_One;
+         SRB := @ + Grid_One;
+         Accumulated := 0;
+      end loop Outer;
 
       --  Fill_Span
       --    (Device_Pixel (Ellipse_X (A, B, Y - 3*Grid_One)),
