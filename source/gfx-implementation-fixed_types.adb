@@ -1,5 +1,5 @@
 --
---  Copyright (C) 2024, Vadim Godunko <vgodunko@gmail.com>
+--  Copyright (C) 2024-2026, Vadim Godunko <vgodunko@gmail.com>
 --
 --  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 --
@@ -72,10 +72,30 @@ package body GFX.Implementation.Fixed_Types is
    ---------
 
    overriding function "+"
+     (Left : Fixed_6; Right : Fixed_6) return Fixed_6 is
+   begin
+      return Fixed_6 (GX_Integer (Left) + GX_Integer (Right));
+   end "+";
+
+   ---------
+   -- "+" --
+   ---------
+
+   overriding function "+"
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
    begin
       return Fixed_16 (Integer (Left) + Integer (Right));
    end "+";
+
+   ---------
+   -- "-" --
+   ---------
+
+   overriding function "-"
+     (Left : Fixed_6; Right : Fixed_6) return Fixed_6 is
+   begin
+      return Fixed_6 (GX_Integer (Left) - GX_Integer (Right));
+   end "-";
 
    ---------
    -- "-" --

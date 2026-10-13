@@ -1,5 +1,5 @@
 --
---  Copyright (C) 2024, Vadim Godunko <vgodunko@gmail.com>
+--  Copyright (C) 2024-2026, Vadim Godunko <vgodunko@gmail.com>
 --
 --  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 --
@@ -37,6 +37,10 @@ is
      (Item : GFX.Rasteriser.Device_Pixel_Coordinate) return Fixed_6;
    --  Convert given floating point value to binary fixed point value with 6
    --  bits of precision.
+
+   function "+" (Left : Fixed_6; Right : Fixed_6) return Fixed_6;
+
+   function "-" (Left : Fixed_6; Right : Fixed_6) return Fixed_6;
 
    function "-" (Right : Fixed_16) return Fixed_16;
 
