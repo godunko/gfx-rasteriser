@@ -163,6 +163,9 @@ is
    --  Converts given fixed point value in range 0.0 .. 1.0 into grayscale
    --  value in range 0 .. 255.
 
+   function Truncate (Item : Fixed_16) return Fixed_6;
+   --  Reduce precision to six fractional bits, truncating toward zero.
+
 private
 
    type Fixed_6 is new GFX.GX_Integer;
@@ -176,6 +179,9 @@ private
    Fixed_16_Delta_Fixed : constant Fixed_16 := 1;
    Fixed_16_First       : constant Fixed_16 := Fixed_16'First;
    Fixed_16_Last        : constant Fixed_16 := Fixed_16'Last;
+
+   function Truncate (Item : Fixed_16) return Fixed_6 is
+     (Fixed_6 (GX_Integer (Item) / 2**10));
 
    overriding function "+"
      (Left : Fixed_6; Right : Fixed_6) return Fixed_6 is
