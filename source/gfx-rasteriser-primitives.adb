@@ -50,6 +50,18 @@ package body GFX.Rasteriser.Primitives is
       Left_Bottom_Edge_Slope_Y         : Fixed_16;
       Luminance                        : in out Fixed_16);
 
+   procedure Luminance_Right_Vertex
+     (Right_Vertex_X          : Fixed_16;
+      Right_Vertex_Y          : Fixed_16;
+      Pixel_Top               : Fixed_16;
+      Pixel_Left              : Fixed_16;
+      Pixel_Bottom            : Fixed_16;
+      Top_Right_Slope_X       : Fixed_16;
+      Top_Right_Slope_Y       : Fixed_16;
+      Bottom_Right_Slope_X    : Fixed_16;
+      Bottom_Right_Slope_Y    : Fixed_16;
+      Luminance               : in out Fixed_16);
+
    procedure Luminance_Bottom_Vertex
      (Bottom_Vertex_X          : Fixed_16;
       Bottom_Vertex_Y          : Fixed_16;
@@ -617,6 +629,111 @@ package body GFX.Rasteriser.Primitives is
              - Right_Coverage (Left_Bottom_Edge_At_Pixel_Right);
       end if;
    end Luminance_Left_Vertex;
+
+   ----------------------------
+   -- Luminance_Right_Vertex --
+   ----------------------------
+
+   procedure Luminance_Right_Vertex
+     (Right_Vertex_X          : Fixed_16;
+      Right_Vertex_Y          : Fixed_16;
+      Pixel_Top               : Fixed_16;
+      Pixel_Left              : Fixed_16;
+      Pixel_Bottom            : Fixed_16;
+      Top_Right_Slope_X       : Fixed_16;
+      Top_Right_Slope_Y       : Fixed_16;
+      Bottom_Right_Slope_X    : Fixed_16;
+      Bottom_Right_Slope_Y    : Fixed_16;
+      Luminance               : in out Fixed_16)
+   is
+      Top_Edge_At_Pixel_Top : constant Fixed_16 :=
+        Right_Vertex_X - (Right_Vertex_Y - Pixel_Top) * Top_Right_Slope_X;
+      Bottom_Edge_At_Pixel_Bottom : constant Fixed_16 :=
+        Right_Vertex_X
+          - (Right_Vertex_Y - Pixel_Bottom) * Bottom_Right_Slope_X;
+      Edge_At_Pixel_Left : Fixed_16;
+
+   begin
+      if Right_Vertex_X = Pixel_Left then
+         --  The rectangle's rightmost point only touches this pixel's left
+         --  boundary, so the intersection has zero area. Set the remaining
+         --  coverage to zero: subtracting One could make it negative after
+         --  a previous left-edge deduction.
+         --
+         --  +-------+
+         --  |       |
+         --  *   X   |
+         --  |       |
+         --  +-------+
+
+         Luminance := Zero;
+
+         return;
+      end if;
+
+      if Top_Edge_At_Pixel_Top > Pixel_Left then
+         --  +--x----+
+         --  |   \ X |
+         --  |    *--|
+         --  |       |
+         --  +-------+
+
+         Luminance :=
+           @
+             - (Right_Coverage (Top_Edge_At_Pixel_Top)
+                  + Right_Coverage (Right_Vertex_X))
+               / 2
+               * Left_Coverage (Right_Vertex_Y);
+
+      else
+         --  +-------+
+         --  |   X   |
+         --  x \     |
+         --  |   *---|
+         --  +-------+
+
+         Edge_At_Pixel_Left :=
+           Right_Vertex_Y - (Right_Vertex_X - Pixel_Left) * Top_Right_Slope_Y;
+         Luminance :=
+           @
+             - Left_Coverage (Edge_At_Pixel_Left)
+             - (Right_Coverage (Right_Vertex_X) + One)
+               / 2
+               * (Right_Vertex_Y - Edge_At_Pixel_Left);
+      end if;
+
+      if Bottom_Edge_At_Pixel_Bottom > Pixel_Left then
+         --  +-------+
+         --  |       |
+         --  |    *--|
+         --  |   / X |
+         --  +--x----+
+
+         Luminance :=
+           @
+             - (Right_Coverage (Right_Vertex_X)
+                  + Right_Coverage (Bottom_Edge_At_Pixel_Bottom))
+               / 2
+               * Right_Coverage (Right_Vertex_Y);
+
+      else
+         --  +-------+
+         --  |   *---|
+         --  x /     |
+         --  |   X   |
+         --  +-------+
+
+         Edge_At_Pixel_Left :=
+           Right_Vertex_Y
+             - (Right_Vertex_X - Pixel_Left) * Bottom_Right_Slope_Y;
+         Luminance :=
+           @
+             - (Right_Coverage (Right_Vertex_X) + One)
+               / 2
+               * (Edge_At_Pixel_Left - Right_Vertex_Y)
+             - Right_Coverage (Edge_At_Pixel_Left);
+      end if;
+   end Luminance_Right_Vertex;
 
    --------------------------
    -- Luminance_Right_Edge --
@@ -1240,15 +1357,32 @@ package body GFX.Rasteriser.Primitives is
                   end if;
 
                   if RS <= Pixel_Right then
-                     Luminance_Right_Edge
-                       (Pixel_Top                  => Row_Top,
-                        Pixel_Bottom               => Row_Bottom,
-                        Pixel_Right                => Pixel_Right,
-                        Right_Edge_At_Pixel_Left   => Right_Edge_At_Pixel_Left,
-                        Right_Edge_At_Pixel_Top    => Right_Edge_At_Row_Top,
-                        Right_Edge_At_Pixel_Bottom => Right_Edge_At_Row_Bottom,
-                        Right_Edge_Slope_Y         => Right_Slope_Y,
-                        Luminance                  => Pixel_Coverage);
+                     if Row_Top = Floor (Right_Vertex_Y)
+                       and Pixel_Left = Floor (Right_Vertex_X)
+                     then
+                        Luminance_Right_Vertex
+                          (Right_Vertex_X       => Right_Vertex_X,
+                           Right_Vertex_Y       => Right_Vertex_Y,
+                           Pixel_Top            => Row_Top,
+                           Pixel_Left           => Pixel_Left,
+                           Pixel_Bottom         => Row_Bottom,
+                           Top_Right_Slope_X    => Top_Right_Slope_X,
+                           Top_Right_Slope_Y    => Top_Right_Slope_Y,
+                           Bottom_Right_Slope_X => Bottom_Right_Slope_X,
+                           Bottom_Right_Slope_Y => Bottom_Right_Slope_Y,
+                           Luminance            => Pixel_Coverage);
+
+                     else
+                        Luminance_Right_Edge
+                          (Pixel_Top                  => Row_Top,
+                           Pixel_Bottom               => Row_Bottom,
+                           Pixel_Right                => Pixel_Right,
+                           Right_Edge_At_Pixel_Left   => Right_Edge_At_Pixel_Left,
+                           Right_Edge_At_Pixel_Top    => Right_Edge_At_Row_Top,
+                           Right_Edge_At_Pixel_Bottom => Right_Edge_At_Row_Bottom,
+                           Right_Edge_Slope_Y         => Right_Slope_Y,
+                           Luminance                  => Pixel_Coverage);
+                     end if;
                   end if;
                end if;
 
@@ -1282,15 +1416,32 @@ package body GFX.Rasteriser.Primitives is
             while Pixel_Left <= Pixel_Lower_Bound (RE) loop
                Pixel_Coverage := One;
 
-               Luminance_Right_Edge
-                 (Pixel_Top                  => Row_Top,
-                  Pixel_Bottom               => Row_Bottom,
-                  Pixel_Right                => Pixel_Right,
-                  Right_Edge_At_Pixel_Left   => Right_Edge_At_Pixel_Left,
-                  Right_Edge_At_Pixel_Top    => Right_Edge_At_Row_Top,
-                  Right_Edge_At_Pixel_Bottom => Right_Edge_At_Row_Bottom,
-                  Right_Edge_Slope_Y         => Right_Slope_Y,
-                  Luminance                  => Pixel_Coverage);
+               if Row_Top = Floor (Right_Vertex_Y)
+                 and Pixel_Left = Floor (Right_Vertex_X)
+               then
+                  Luminance_Right_Vertex
+                    (Right_Vertex_X       => Right_Vertex_X,
+                     Right_Vertex_Y       => Right_Vertex_Y,
+                     Pixel_Top            => Row_Top,
+                     Pixel_Left           => Pixel_Left,
+                     Pixel_Bottom         => Row_Bottom,
+                     Top_Right_Slope_X    => Top_Right_Slope_X,
+                     Top_Right_Slope_Y    => Top_Right_Slope_Y,
+                     Bottom_Right_Slope_X => Bottom_Right_Slope_X,
+                     Bottom_Right_Slope_Y => Bottom_Right_Slope_Y,
+                     Luminance            => Pixel_Coverage);
+
+               else
+                  Luminance_Right_Edge
+                    (Pixel_Top                  => Row_Top,
+                     Pixel_Bottom               => Row_Bottom,
+                     Pixel_Right                => Pixel_Right,
+                     Right_Edge_At_Pixel_Left   => Right_Edge_At_Pixel_Left,
+                     Right_Edge_At_Pixel_Top    => Right_Edge_At_Row_Top,
+                     Right_Edge_At_Pixel_Bottom => Right_Edge_At_Row_Bottom,
+                     Right_Edge_Slope_Y         => Right_Slope_Y,
+                     Luminance                  => Pixel_Coverage);
+               end if;
 
                Fill_Span
                  (Integral (Pixel_Left),
