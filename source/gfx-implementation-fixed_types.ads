@@ -5,7 +5,7 @@
 --
 
 --  This package contains type declarations and operations for binary fixed
---  point types with 6 and 16 bits of the precision used for rasterizing.
+--  point types with 6, 12 and 16 bits of the precision used for rasterizing.
 --
 --  They use GX_Integer as base type, which is 32bit on 32bit CPUs, thus enough
 --  to support displays with reasonable size for modern 32-bit MCUs. On 64bit
@@ -30,8 +30,16 @@ is
    type Fixed_16 is private
      with Preelaborable_Initialization;
 
-   Zero                 : constant Fixed_16;
-   One                  : constant Fixed_16;
+   function Zero return Fixed_6;
+
+   function One return Fixed_6;
+
+   function Zero return Fixed_12;
+
+   function Zero return Fixed_16;
+
+   function One return Fixed_16;
+
    Fixed_16_Delta_Fixed : constant Fixed_16;
    Fixed_16_First       : constant Fixed_16;
    Fixed_16_Last        : constant Fixed_16;
@@ -47,13 +55,19 @@ is
 
    function "-" (Left : Fixed_6; Right : Fixed_6) return Fixed_6;
 
+   function "*" (Left : GX_Integer; Right : Fixed_6) return Fixed_6;
+
    function "*" (Left : Fixed_6; Right : Fixed_6) return Fixed_12;
 
    function "+" (Left : Fixed_12; Right : Fixed_12) return Fixed_12;
 
    function "-" (Left : Fixed_12; Right : Fixed_12) return Fixed_12;
 
+   function "*" (Left : GX_Integer; Right : Fixed_12) return Fixed_12;
+
    function "abs" (Right : Fixed_12) return Fixed_12;
+
+   function "<=" (Left : Fixed_12; Right : Fixed_12) return Boolean;
 
    function "-" (Right : Fixed_16) return Fixed_16;
 
@@ -136,6 +150,9 @@ is
    function Right_Coverage (Item : Fixed_16) return Fixed_16;
    --  Returns coverage of the pixel at the right side from the given value.
 
+   function Integral (Item : Fixed_12) return GX_Integer;
+   --  Return integral part, truncating toward zero.
+
    function Integral (Item : Fixed_16) return GX_Integer;
    --  Returns integral part of the given value (round toward zero,
    --  truncation).
@@ -198,8 +215,16 @@ private
 
    type Fixed_16 is new GFX.GX_Integer;
 
-   Zero                 : constant Fixed_16 := 0;
-   One                  : constant Fixed_16 := 2**16;
+   function Zero return Fixed_6 is (0);
+
+   function Zero return Fixed_12 is (0);
+
+   function Zero return Fixed_16 is (0);
+
+   function One return Fixed_6 is (2 ** 6);
+
+   function One return Fixed_16 is (2 ** 16);
+
    Fixed_16_Delta_Fixed : constant Fixed_16 := 1;
    Fixed_16_First       : constant Fixed_16 := Fixed_16'First;
    Fixed_16_Last        : constant Fixed_16 := Fixed_16'Last;
@@ -228,6 +253,9 @@ private
    function "/" (Left : Fixed_12; Right : GX_Integer) return Fixed_12 is
       (Fixed_12 (GX_Integer (Left) / Right));
 
+   function "*" (Left : GX_Integer; Right : Fixed_6) return Fixed_6 is
+     (Fixed_6 (Left * GX_Integer (Right)));
+
    function "*" (Left : Fixed_6; Right : Fixed_6) return Fixed_12 is
      (Fixed_12 (GX_Integer (Left) * GX_Integer (Right)));
 
@@ -239,8 +267,18 @@ private
      (Left : Fixed_12; Right : Fixed_12) return Fixed_12 is
        (Fixed_12 (GX_Integer (Left) - GX_Integer (Right)));
 
+   function "*" (Left : GX_Integer; Right : Fixed_12) return Fixed_12 is
+     (Fixed_12 (Left * GX_Integer (Right)));
+
    overriding function "abs" (Right : Fixed_12) return Fixed_12 is
      (Fixed_12 (abs GX_Integer (Right)));
+
+   overriding function "<="
+     (Left : Fixed_12; Right : Fixed_12) return Boolean is
+       (GX_Integer (Left) <= GX_Integer (Right));
+
+   function Integral (Item : Fixed_12) return GX_Integer is
+     (GX_Integer (Item) / 2**12);
 
    overriding function "<"
      (Left : Fixed_16; Right : Fixed_16) return Boolean is
