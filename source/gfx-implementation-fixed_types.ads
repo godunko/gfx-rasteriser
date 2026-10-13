@@ -22,6 +22,9 @@ is
 
    type Fixed_6 is private;
 
+   type Fixed_12 is private
+     with Preelaborable_Initialization;
+
    type Fixed_16 is private
      with Preelaborable_Initialization;
 
@@ -41,6 +44,14 @@ is
    function "+" (Left : Fixed_6; Right : Fixed_6) return Fixed_6;
 
    function "-" (Left : Fixed_6; Right : Fixed_6) return Fixed_6;
+
+   function "*" (Left : Fixed_6; Right : Fixed_6) return Fixed_12;
+
+   function "+" (Left : Fixed_12; Right : Fixed_12) return Fixed_12;
+
+   function "-" (Left : Fixed_12; Right : Fixed_12) return Fixed_12;
+
+   function "abs" (Right : Fixed_12) return Fixed_12;
 
    function "-" (Right : Fixed_16) return Fixed_16;
 
@@ -156,6 +167,8 @@ private
 
    type Fixed_6 is new GFX.GX_Integer;
 
+   type Fixed_12 is new GFX.GX_Integer;
+
    type Fixed_16 is new GFX.GX_Integer;
 
    Zero                 : constant Fixed_16 := 0;
@@ -171,6 +184,20 @@ private
    overriding function "-"
      (Left : Fixed_6; Right : Fixed_6) return Fixed_6 is
        (Fixed_6 (GX_Integer (Left) - GX_Integer (Right)));
+
+   function "*" (Left : Fixed_6; Right : Fixed_6) return Fixed_12 is
+     (Fixed_12 (GX_Integer (Left) * GX_Integer (Right)));
+
+   overriding function "+"
+     (Left : Fixed_12; Right : Fixed_12) return Fixed_12 is
+       (Fixed_12 (GX_Integer (Left) + GX_Integer (Right)));
+
+   overriding function "-"
+     (Left : Fixed_12; Right : Fixed_12) return Fixed_12 is
+       (Fixed_12 (GX_Integer (Left) - GX_Integer (Right)));
+
+   overriding function "abs" (Right : Fixed_12) return Fixed_12 is
+     (Fixed_12 (abs GX_Integer (Right)));
 
    overriding function "<"
      (Left : Fixed_16; Right : Fixed_16) return Boolean is
