@@ -1,6 +1,6 @@
 name = "gfx_rasteriser"
+version = "0.2.0-dev"
 description = "Modular Portable Graphics Library, Primitive's Rasteriser"
-version = "0.1.0"
 
 authors = ["Vadim Godunko"]
 maintainers = ["Vadim Godunko <vgodunko@gmail.com>"]
