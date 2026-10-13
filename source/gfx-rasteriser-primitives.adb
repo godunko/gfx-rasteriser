@@ -748,7 +748,7 @@ package body GFX.Rasteriser.Primitives is
                Luminance :=
                  @
                    - (Left_Coverage (Right_Edge_At_Pixel_Left)
-                        + Right_Coverage (Right_Edge_At_Pixel_Right))
+                        + Left_Coverage (Right_Edge_At_Pixel_Right))
                       / 2;
             end if;
          end if;
