@@ -1,5 +1,5 @@
 --
---  Copyright (C) 2024, Vadim Godunko <vgodunko@gmail.com>
+--  Copyright (C) 2024-2026, Vadim Godunko <vgodunko@gmail.com>
 --
 --  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 --
@@ -508,10 +508,9 @@ package body GFX.Rasteriser.Primitives is
 
             Luminance :=
               @
-              - (One
-                   - Left_Coverage (Left_Edge_At_Pixel_Bottom)
-                   * Right_Coverage (Left_Edge_At_Pixel_Left)
-                   / 2);
+                - Left_Coverage (Left_Edge_At_Pixel_Bottom)
+                    * Right_Coverage (Left_Edge_At_Pixel_Left)
+                    / 2;
 
          else
             if Left_Edge_Slope_Y < Zero then
