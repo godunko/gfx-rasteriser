@@ -164,4 +164,39 @@ private
    Fixed_16_First       : constant Fixed_16 := Fixed_16'First;
    Fixed_16_Last        : constant Fixed_16 := Fixed_16'Last;
 
+   overriding function "+"
+     (Left : Fixed_6; Right : Fixed_6) return Fixed_6 is
+       (Fixed_6 (GX_Integer (Left) + GX_Integer (Right)));
+
+   overriding function "-"
+     (Left : Fixed_6; Right : Fixed_6) return Fixed_6 is
+       (Fixed_6 (GX_Integer (Left) - GX_Integer (Right)));
+
+   overriding function "<"
+     (Left : Fixed_16; Right : Fixed_16) return Boolean is
+       (GX_Integer (Left) < GX_Integer (Right));
+
+   overriding function "<="
+     (Left : Fixed_16; Right : Fixed_16) return Boolean is
+       (GX_Integer (Left) <= GX_Integer (Right));
+
+   overriding function ">"
+     (Left : Fixed_16; Right : Fixed_16) return Boolean is
+       (GX_Integer (Left) > GX_Integer (Right));
+
+   overriding function ">="
+     (Left : Fixed_16; Right : Fixed_16) return Boolean is
+       (GX_Integer (Left) >= GX_Integer (Right));
+
+   overriding function "+"
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
+       (Fixed_16 (Integer (Left) + Integer (Right)));
+
+   overriding function "-" (Right : Fixed_16) return Fixed_16 is
+     (Fixed_16 (-GX_Integer (Right)));
+
+   overriding function "-"
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
+       (Fixed_16 (Integer (Left) - Integer (Right)));
+
 end GFX.Implementation.Fixed_Types;
