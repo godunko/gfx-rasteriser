@@ -55,6 +55,22 @@ is
    --  axis, with contour points at coordinate 10 also accepted. Each lower
    --  bound must be strictly less than the corresponding upper bound.
 
+   function X_Min
+     (Self : GF_Clipping_Rectangle)
+     return GFX.Rasteriser.Device_Pixel_Coordinate;
+
+   function X_Max
+     (Self : GF_Clipping_Rectangle)
+      return GFX.Rasteriser.Device_Pixel_Coordinate;
+
+   function Y_Min
+     (Self : GF_Clipping_Rectangle)
+      return GFX.Rasteriser.Device_Pixel_Coordinate;
+
+   function Y_Max
+     (Self : GF_Clipping_Rectangle)
+      return GFX.Rasteriser.Device_Pixel_Coordinate;
+
    type Rendering_Area is private
      with Preelaborable_Initialization;
 
@@ -101,6 +117,22 @@ private
       Y_Max : GFX.Implementation.Fixed_Types.Fixed_16; --  :=
         --  GFX.Implementation.Fixed_Types.Fixed_16_Last;
    end record;
+
+   function X_Min
+     (Self : GF_Clipping_Rectangle)
+      return GFX.Rasteriser.Device_Pixel_Coordinate is (Self.X_Min);
+
+   function X_Max
+     (Self : GF_Clipping_Rectangle)
+      return GFX.Rasteriser.Device_Pixel_Coordinate is (Self.X_Max);
+
+   function Y_Min
+     (Self : GF_Clipping_Rectangle)
+      return GFX.Rasteriser.Device_Pixel_Coordinate is (Self.Y_Min);
+
+   function Y_Max
+     (Self : GF_Clipping_Rectangle)
+      return GFX.Rasteriser.Device_Pixel_Coordinate is (Self.Y_Max);
 
    function X_Min
      (Self : Rendering_Area) return GFX.Implementation.Fixed_Types.Fixed_16 is
