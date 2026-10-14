@@ -152,4 +152,16 @@ is
    --  Return the largest representable coordinate below the initial
    --  coordinate of the next pixel.
 
+   function Pixel_Lower_Subpixel
+     (Item : Device_Pixel_Index) return Device_Pixel_Coordinate is
+       (Device_Pixel_Coordinate (Item))
+     with Pre => Is_Valid_Device_Pixel (Item);
+   --  Return the coordinate of subpixel 0 of the given pixel.
+
+   function Pixel_Upper_Subpixel
+     (Item : Device_Pixel_Index) return Device_Pixel_Coordinate is
+       (Device_Pixel_Coordinate (Item) + 63.0 / 64.0)
+     with Pre => Is_Valid_Device_Pixel (Item);
+   --  Return the coordinate of subpixel 63 of the given pixel.
+
 end GFX.Rasteriser;
