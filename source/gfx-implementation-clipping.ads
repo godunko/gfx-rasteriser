@@ -52,10 +52,14 @@ is
       Clip_A   : out GFX.Points.GF_Point;
       Clip_B   : out GFX.Points.GF_Point;
       Side_A   : out Clip_Side;
-      Side_B   : out Clip_Side) return Boolean;
+      Side_B   : out Clip_Side;
+      Reject   : out Outcode) return Boolean;
    --  `Side_A` and `Side_B` are valid only when the function returns `True`.
    --  An endpoint initially on the clipping boundary is not identified as
    --  such; its corresponding side remains None.
+   --  `Reject` is Inside on success. On failure it contains the common
+   --  outside bits of the current endpoints at rejection, after any clipping
+   --  steps; these need not be common bits of the original endpoints.
 
    procedure Set_Bound
      (Self  : out GF_Clipping_Rectangle;

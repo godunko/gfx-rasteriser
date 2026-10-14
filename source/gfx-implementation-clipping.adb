@@ -144,7 +144,8 @@ package body GFX.Implementation.Clipping is
       Clip_A   : out GFX.Points.GF_Point;
       Clip_B   : out GFX.Points.GF_Point;
       Side_A   : out Clip_Side;
-      Side_B   : out Clip_Side) return Boolean
+      Side_B   : out Clip_Side;
+      Reject   : out Outcode) return Boolean
    is
       use type GFX.Implementation.Clipping.Outcode;
 
@@ -158,6 +159,7 @@ package body GFX.Implementation.Clipping is
       Clip_B := Vertex_B;
       Side_A := None;
       Side_B := None;
+      Reject := Inside;
 
       loop
          if Code_A = GFX.Implementation.Clipping.Inside
@@ -169,6 +171,8 @@ package body GFX.Implementation.Clipping is
 
          elsif (Code_A and Code_B) /= GFX.Implementation.Clipping.Inside then
             --  Both endpoints share an outside region (trivial reject)
+
+            Reject := Code_A and Code_B;
 
             return False;
 
