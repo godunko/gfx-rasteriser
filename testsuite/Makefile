@@ -5,6 +5,7 @@ build:
 	alr build
 
 run:
+	./bin/gf_clip_rectangle
 	rm -rf output
 	mkdir output
 	(cd output && ../bin/radial_lines)

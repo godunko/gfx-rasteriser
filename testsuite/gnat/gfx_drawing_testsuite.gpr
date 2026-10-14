@@ -14,7 +14,10 @@ project GFX_Drawing_Testsuite is
    for Object_Dir use
      "../.objs/" & GFX_Drawing_Testsuite_Config.Build_Profile & GFX_Common.Object_Dir_Suffix;
    for Exec_Dir use "../bin";
-   for Main use ("thick_line_1", "radial_lines");
+   for Main use
+     ("thick_line_1",
+      "radial_lines",
+      "gf_clip_rectangle");
 
    package Compiler is
       for Switches ("Ada") use GFX_Drawing_Testsuite_Config.Ada_Compiler_Switches & ("-O0", "-g");
