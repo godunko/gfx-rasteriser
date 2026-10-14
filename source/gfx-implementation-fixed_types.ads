@@ -98,6 +98,12 @@ is
    --  ??? Float->Integer conversion is expensive on ARMv7M, can it be
    --  optimized ???
 
+   function Snap_To_Subpixel
+     (Item : GFX.Rasteriser.Device_Pixel_Coordinate) return Fixed_16;
+   --  Convert given floating point value to binary fixed point value with 16
+   --  bits of precision, rounded toward negative infinity to a 1/64 pixel
+   --  boundary.
+
    function Snap_To_Subpixel_Grid
      (Item : GFX.Rasteriser.Device_Pixel_Coordinate) return Fixed_16;
    --  Convert given floating point value to binary fixed point value with 16

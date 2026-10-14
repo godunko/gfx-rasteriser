@@ -317,6 +317,18 @@ package body GFX.Implementation.Fixed_Types is
       return To_Fixed_16 (2**16 - (To_Unsigned (Item) and 16#FFFF#));
    end Right_Coverage;
 
+   ----------------------
+   -- Snap_To_Subpixel --
+   ----------------------
+
+   function Snap_To_Subpixel
+     (Item : GFX.Rasteriser.Device_Pixel_Coordinate) return Fixed_16 is
+   begin
+      return
+        Fixed_16
+          (GX_Integer (GX_Real'Floor (Item * 64.0)) * GX_Integer'(16#400#));
+   end Snap_To_Subpixel;
+
    ---------------------------
    -- Snap_To_Subpixel_Grid --
    ---------------------------
