@@ -1,10 +1,12 @@
 --
---  Copyright (C) 2024, Vadim Godunko <vgodunko@gmail.com>
+--  Copyright (C) 2024-2026, Vadim Godunko <vgodunko@gmail.com>
 --
 --  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 --
 
 --  Clipping utilities
+
+pragma Ada_2022;
 
 pragma Restrictions (No_Elaboration_Code);
 
@@ -19,6 +21,8 @@ is
 
    type Outcode is array (Outside_Direction) of Boolean
      with Pack, Size => 4;
+
+   Inside : constant Outcode := [others => False];
 
    type Rendering_Area is private
      with Preelaborable_Initialization;
