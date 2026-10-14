@@ -11,6 +11,7 @@ pragma Ada_2022;
 pragma Restrictions (No_Elaboration_Code);
 
 with GFX.Implementation.Fixed_Types;
+with GFX.Points;
 with GFX.Rasteriser;
 
 package GFX.Implementation.Clipping
@@ -23,6 +24,36 @@ is
      with Pack, Size => 4;
 
    Inside : constant Outcode := [others => False];
+
+   type GF_Clipping_Rectangle is private with Preelaborable_Initialization;
+   --  Clip the geometric contour against a closed rectangle:
+   --    * `X_Min` <= `X` <= `X_Max`
+   --    * `Y_Min` <= `Y` <= `Y_Max`
+   --  All bounds are geometric coordinates on pixel boundaries. Contour
+   --  points on any of the four boundaries are valid.
+
+   function Compute_Outcode
+     (Self  : GF_Clipping_Rectangle;
+      Point : GFX.Points.GF_Point) return GFX.Implementation.Clipping.Outcode;
+
+   function Clip
+     (Self     : GF_Clipping_Rectangle;
+      Vertex_A : GFX.Points.GF_Point;
+      Vertex_B : GFX.Points.GF_Point;
+      Clip_A   : out GFX.Points.GF_Point;
+      Clip_B   : out GFX.Points.GF_Point) return Boolean;
+
+   procedure Set_Bound
+     (Self  : out GF_Clipping_Rectangle;
+      X_Min : GFX.Rasteriser.Device_Pixel_Index;
+      X_Max : GFX.Rasteriser.Device_Pixel_Index;
+      Y_Min : GFX.Rasteriser.Device_Pixel_Index;
+      Y_Max : GFX.Rasteriser.Device_Pixel_Index)
+     with Pre => (X_Min < X_Max) and (Y_Min < Y_Max);
+   --  Set the geometric bounds directly from the given integer coordinates.
+   --  For example, bounds (0, 10, 0, 10) enclose pixels 0 .. 9 along each
+   --  axis, with contour points at coordinate 10 also accepted. Each lower
+   --  bound must be strictly less than the corresponding upper bound.
 
    type Rendering_Area is private
      with Preelaborable_Initialization;
@@ -52,6 +83,13 @@ is
    --  Compute position of the given point relative to the clipping area.
 
 private
+
+   type GF_Clipping_Rectangle is record
+      X_Min : GX_Real;
+      X_Max : GX_Real;
+      Y_Min : GX_Real;
+      Y_Max : GX_Real;
+   end record;
 
    type Rendering_Area is record
       X_Min : GFX.Implementation.Fixed_Types.Fixed_16; -- :=
