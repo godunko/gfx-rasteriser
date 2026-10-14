@@ -59,39 +59,97 @@
 --  The limit concerns the number of DDA steps, not the display resolution.
 --  Even smaller errors can change coverage near subpixel grid boundaries.
 --
---  5. Device pixel coordinates and indices supplied to the rasterizer must
---  be representable by `Fixed_16`. With a signed 32-bit underlying integer,
---  its range is -32_768.0 .. 32_768.0 - 2**(-16); integral pixel indices
---  therefore range from -32_768 to 32_767. `Device_Pixel_Coordinate` is
---  constrained to the GX_Real values within this range.
+--  5. With a signed 32-bit underlying integer, `Fixed_16` has the range
+--  -32_768.0 .. 32_768.0 - 2**(-16). The intended input pixel index range
+--  is -16_384 .. 16_382 (-2**14 .. 2**14 - 2). Coordinates within these
+--  pixels lie in [-16_384.0, 16_383.0).
+--
+--  This range ensures that differences of any two input coordinates fit
+--  in `Fixed_16`. Rendering areas use half-open intervals [Left, Right)
+--  and [Top, Bottom). Each boundary denotes the left/top edge of the pixel
+--  at that coordinate. The value 16_383 is allowed only as the exclusive
+--  right/bottom boundary; it does not designate a pixel included in the
+--  rendering area. Subpixel coordinates beyond this boundary are not used.
+--  Differences involving this boundary also fit in `Fixed_16`. No previous
+--  pixel is needed at the lower boundary, so no additional lower-end margin
+--  is reserved.
 --
 --  The application is responsible for clipping geometry before passing it
---  to the rasterizer. Input range constraints alone do not prevent overflow:
---  intermediate values stored as `Fixed_16`, including coordinate
---  differences and DDA increments, must also fit within its range.
+--  to the rasterizer. This input range makes coordinate subtraction safe,
+--  but other intermediate values, including DDA increments and products,
+--  must still fit in their respective types. These input limits are checked
+--  by `Is_Valid_Device_Pixel`, not enforced by subtype constraints.
+--  The exclusive boundary value 16_383 is not a valid input pixel and
+--  is accepted by `Is_Valid_Upper_Bound` for right/bottom boundaries.
 
 package GFX.Rasteriser
   with Pure
 is
 
    subtype Device_Pixel_Coordinate is GX_Real;
-   --  range -32_768.0 .. GX_Real'Pred (32_768.0);
+   --  range -16_384.0 .. GX_Real'Pred (16_383.0);
    --
    --  Coordinate in device pixel units. Integral values correspond to pixel
    --  boundaries; pixel centers have a fractional part of 0.5.
    --
-   --  The upper bound is the largest GX_Real value below 32_768.0, since
-   --  the exact Fixed_16 upper bound is not representable by GX_Real.
+   --  The intended upper bound is the largest GX_Real value below
+   --  16_383.0. The coordinate 16_383.0 is allowed only as the exclusive
+   --  right/bottom boundary of a rendering area.
 
    subtype Device_Pixel_Index is GX_Integer;
-   --  range -32_768 .. 32_768 - 1;
+   --  range -16_384 .. 16_384 - 2;
    --
    --  Index of the device's hardware pixel.
+   --  The value 16_383 is allowed only as the exclusive right/bottom
+   --  boundary of a rendering area, not as an included pixel index.
 
    subtype Device_Pixel_Count is Device_Pixel_Index
      range 0 .. Device_Pixel_Index'Last;
 
    subtype Grayscale is Interfaces.Unsigned_8;
    --  Grayscale level.
+
+   function Is_Valid_Device_Pixel
+     (Item : Device_Pixel_Coordinate) return Boolean is
+        (Item in -16_384.0 .. GX_Real'Pred (16_383.0));
+
+   function Is_Valid_Device_Pixel
+     (Item : Device_Pixel_Index) return Boolean is
+       (Item in -16_384 .. 16_384 - 2);
+
+   function Is_Valid_Lower_Bound
+     (Item : Device_Pixel_Coordinate) return Boolean is
+       (Is_Valid_Device_Pixel (Item));
+   --  Check a left/top boundary of a half-open rendering area.
+
+   function Is_Valid_Lower_Bound
+     (Item : Device_Pixel_Index) return Boolean is
+       (Is_Valid_Device_Pixel (Item));
+   --  Check a left/top boundary expressed as a pixel index.
+
+   function Is_Valid_Upper_Bound
+     (Item : Device_Pixel_Coordinate) return Boolean is
+       (Item in -16_384.0 .. 16_383.0);
+   --  Check an exclusive right/bottom boundary of a half-open rendering
+   --  area, including the terminal coordinate 16_383.0.
+
+   function Is_Valid_Upper_Bound
+     (Item : Device_Pixel_Index) return Boolean is
+       (Item in -16_384 .. 16_383);
+   --  Check an exclusive right/bottom boundary expressed as a pixel index,
+   --  including the terminal index 16_383.
+
+   function Pixel_Lower_Bound
+     (Item : Device_Pixel_Index) return Device_Pixel_Coordinate is
+       (Device_Pixel_Coordinate (Item))
+     with Pre => Is_Valid_Device_Pixel (Item);
+   --  Return the initial coordinate of the given pixel.
+
+   function Pixel_Upper_Bound
+     (Item : Device_Pixel_Index) return Device_Pixel_Coordinate is
+       (Device_Pixel_Coordinate'Pred (Device_Pixel_Coordinate (Item) + 1.0))
+     with Pre => Is_Valid_Device_Pixel (Item);
+   --  Return the largest representable coordinate below the initial
+   --  coordinate of the next pixel.
 
 end GFX.Rasteriser;
