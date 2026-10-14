@@ -133,6 +133,139 @@ package body GFX.Implementation.Clipping is
       end loop;
    end Clip;
 
+   ----------
+   -- Clip --
+   ----------
+
+   function Clip
+     (Self     : GF_Clipping_Rectangle;
+      Vertex_A : GFX.Points.GF_Point;
+      Vertex_B : GFX.Points.GF_Point;
+      Clip_A   : out GFX.Points.GF_Point;
+      Clip_B   : out GFX.Points.GF_Point;
+      Side_A   : out Clip_Side;
+      Side_B   : out Clip_Side) return Boolean
+   is
+      use type GFX.Implementation.Clipping.Outcode;
+
+      Code_A : GFX.Implementation.Clipping.Outcode :=
+        Compute_Outcode (Self, Vertex_A);
+      Code_B : GFX.Implementation.Clipping.Outcode :=
+        Compute_Outcode (Self, Vertex_B);
+
+   begin
+      Clip_A := Vertex_A;
+      Clip_B := Vertex_B;
+      Side_A := None;
+      Side_B := None;
+
+      loop
+         if Code_A = GFX.Implementation.Clipping.Inside
+           and Code_B = GFX.Implementation.Clipping.Inside
+         then
+            --  Both endpoints lie inside the rectangle
+
+            return True;
+
+         elsif (Code_A and Code_B) /= GFX.Implementation.Clipping.Inside then
+            --  Both endpoints share an outside region (trivial reject)
+
+            return False;
+
+         elsif Code_A /= GFX.Implementation.Clipping.Inside then
+            if Code_A (GFX.Implementation.Clipping.X_Decrease) then
+               Clip_A :=
+                 (X => Self.X_Min,
+                  Y =>
+                    Clip_A.Y
+                      + (Clip_B.Y - Clip_A.Y)
+                        * (Self.X_Min - Clip_A.X)
+                          / (Clip_B.X - Clip_A.X));
+               Side_A := X_Min;
+
+            elsif Code_A (GFX.Implementation.Clipping.X_Increase) then
+               Clip_A :=
+                 (X => Self.X_Max,
+                  Y =>
+                    Clip_A.Y
+                      + (Clip_B.Y - Clip_A.Y)
+                        * (Self.X_Max - Clip_A.X)
+                          / (Clip_B.X - Clip_A.X));
+               Side_A := X_Max;
+
+            elsif Code_A (GFX.Implementation.Clipping.Y_Decrease) then
+               Clip_A :=
+                 (X =>
+                    Clip_A.X
+                      + (Clip_B.X - Clip_A.X)
+                        * (Self.Y_Min - Clip_A.Y)
+                          / (Clip_B.Y - Clip_A.Y),
+                  Y => Self.Y_Min);
+               Side_A := Y_Min;
+
+            else
+               --  The remaining outside direction is Y_Increase.
+               Clip_A :=
+                 (X =>
+                    Clip_A.X
+                      + (Clip_B.X - Clip_A.X)
+                        * (Self.Y_Max - Clip_A.Y)
+                          / (Clip_B.Y - Clip_A.Y),
+                  Y => Self.Y_Max);
+               Side_A := Y_Max;
+
+            end if;
+
+            Code_A := Compute_Outcode (Self, Clip_A);
+
+         else
+            if Code_B (GFX.Implementation.Clipping.X_Decrease) then
+               Clip_B :=
+                 (X => Self.X_Min,
+                  Y =>
+                    Clip_A.Y
+                      + (Clip_B.Y - Clip_A.Y)
+                        * (Self.X_Min - Clip_A.X)
+                          / (Clip_B.X - Clip_A.X));
+               Side_B := X_Min;
+
+            elsif Code_B (GFX.Implementation.Clipping.X_Increase) then
+               Clip_B :=
+                 (X => Self.X_Max,
+                  Y =>
+                    Clip_A.Y
+                      + (Clip_B.Y - Clip_A.Y)
+                        * (Self.X_Max - Clip_A.X)
+                          / (Clip_B.X - Clip_A.X));
+               Side_B := X_Max;
+
+            elsif Code_B (GFX.Implementation.Clipping.Y_Decrease) then
+               Clip_B :=
+                 (X =>
+                    Clip_A.X
+                      + (Clip_B.X - Clip_A.X)
+                        * (Self.Y_Min - Clip_A.Y)
+                          / (Clip_B.Y - Clip_A.Y),
+                  Y => Self.Y_Min);
+               Side_B := Y_Min;
+
+            else
+               --  The remaining outside direction is Y_Increase.
+               Clip_B :=
+                 (X =>
+                    Clip_A.X
+                      + (Clip_B.X - Clip_A.X)
+                        * (Self.Y_Max - Clip_A.Y)
+                          / (Clip_B.Y - Clip_A.Y),
+                  Y => Self.Y_Max);
+               Side_B := Y_Max;
+            end if;
+
+            Code_B := Compute_Outcode (Self, Clip_B);
+         end if;
+      end loop;
+   end Clip;
+
    ---------------------
    -- Compute_Outcode --
    ---------------------

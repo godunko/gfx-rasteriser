@@ -25,6 +25,8 @@ is
 
    Inside : constant Outcode := [others => False];
 
+   type Clip_Side is (None, X_Min, X_Max, Y_Min, Y_Max);
+
    type GF_Clipping_Rectangle is private with Preelaborable_Initialization;
    --  Clip the geometric contour against a closed rectangle:
    --    * `X_Min` <= `X` <= `X_Max`
@@ -42,6 +44,18 @@ is
       Vertex_B : GFX.Points.GF_Point;
       Clip_A   : out GFX.Points.GF_Point;
       Clip_B   : out GFX.Points.GF_Point) return Boolean;
+
+   function Clip
+     (Self     : GF_Clipping_Rectangle;
+      Vertex_A : GFX.Points.GF_Point;
+      Vertex_B : GFX.Points.GF_Point;
+      Clip_A   : out GFX.Points.GF_Point;
+      Clip_B   : out GFX.Points.GF_Point;
+      Side_A   : out Clip_Side;
+      Side_B   : out Clip_Side) return Boolean;
+   --  `Side_A` and `Side_B` are valid only when the function returns `True`.
+   --  An endpoint initially on the clipping boundary is not identified as
+   --  such; its corresponding side remains None.
 
    procedure Set_Bound
      (Self  : out GF_Clipping_Rectangle;
