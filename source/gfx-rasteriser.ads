@@ -142,7 +142,7 @@ is
    function Pixel_Lower_Bound
      (Item : Device_Pixel_Index) return Device_Pixel_Coordinate is
        (Device_Pixel_Coordinate (Item))
-     with Pre => Is_Valid_Device_Pixel (Item);
+     with Pre => Is_Valid_Upper_Bound (Item);
    --  Return the initial coordinate of the given pixel.
 
    function Pixel_Upper_Bound
