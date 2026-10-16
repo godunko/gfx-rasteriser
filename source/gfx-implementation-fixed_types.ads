@@ -14,6 +14,8 @@
 
 pragma Restrictions (No_Elaboration_Code);
 
+private with Ada.Unchecked_Conversion;
+
 with GFX.Rasteriser;
 
 package GFX.Implementation.Fixed_Types
@@ -115,13 +117,14 @@ is
      (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16;
    --  Returns lower bound of the given pixel
 
-   function Pixel_Upper_Bound
-     (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16;
-   --  Returns upper bound of the given pixel
-
    function To_Fixed_16 (Item : Fixed_6) return Fixed_16;
    --  Convert given subpixel coordinate to binary fixed point value with
    --  coordinate system offset.
+
+   function To_Fixed_16
+     (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16
+     with Pre => Item in -32_768 .. 32_767;
+   --  Convert index of the given device pixel into `Fixed_16` value.
 
    --  function Distance_From_Previous (Item : Fixed_16) return Fixed_16;
    --  --  Return distance from the previous integral value to the given value. When
@@ -185,6 +188,12 @@ private
    Fixed_16_Delta_Fixed : constant Fixed_16 := 1;
    Fixed_16_First       : constant Fixed_16 := Fixed_16'First;
    Fixed_16_Last        : constant Fixed_16 := Fixed_16'Last;
+   Fixed_16_Scale_I     : constant := 2 ** 16;
+
+   function As_GX_Unsigned is
+     new Ada.Unchecked_Conversion (GX_Integer, GX_Unsigned);
+   function As_Fixed_16 is
+     new Ada.Unchecked_Conversion (GX_Unsigned, Fixed_16);
 
    function Truncate (Item : Fixed_16) return Fixed_6 is
      (Fixed_6 (GX_Integer (Item) / 2**10));
@@ -237,5 +246,10 @@ private
    overriding function "-"
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
        (Fixed_16 (Integer (Left) - Integer (Right)));
+
+   function To_Fixed_16
+     (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16 is
+       (As_Fixed_16
+         (As_GX_Unsigned (Item) * GX_Unsigned (Fixed_16_Scale_I)));
 
 end GFX.Implementation.Fixed_Types;

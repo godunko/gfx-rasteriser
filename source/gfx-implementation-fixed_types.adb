@@ -6,15 +6,12 @@
 
 pragma Restrictions (No_Elaboration_Code);
 
-with Ada.Unchecked_Conversion;
-
 package body GFX.Implementation.Fixed_Types is
 
    use Interfaces;
 
    Fixed_6_Scale       : constant := 2.0 ** 6;
    Fixed_16_Scale_R    : constant := 2.0 ** 16;
-   Fixed_16_Scale_I    : constant := 2 ** 16;
    Fixed_16_Scale_Mask : constant := 2 ** 16 - 1;
    Fixed_6_16_Scale    : constant GX_Integer := 2 ** 10;
    --  Scale to convert Fixed_6 to Fixed_16 values.
@@ -287,17 +284,6 @@ package body GFX.Implementation.Fixed_Types is
    begin
       return To_Fixed_16 (To_Unsigned (Item) and not Fixed_16_Scale_Mask);
    end Pixel_Lower_Bound;
-
-   -----------------------
-   -- Pixel_Upper_Bound --
-   -----------------------
-
-   function Pixel_Upper_Bound
-     (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16 is
-   begin
-      return
-        Fixed_16 (Item * GX_Integer (Fixed_16_Scale_I) + Fixed_16_Scale_Mask);
-   end Pixel_Upper_Bound;
 
    -----------------------
    -- Pixel_Upper_Bound --

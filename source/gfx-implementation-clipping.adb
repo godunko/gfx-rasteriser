@@ -8,9 +8,12 @@ pragma Ada_2022;
 
 pragma Restrictions (No_Elaboration_Code);
 
+with GFX.Implementation.Subpixel_Operations;
+
 package body GFX.Implementation.Clipping is
 
    use GFX.Implementation.Fixed_Types;
+   use GFX.Implementation.Subpixel_Operations;
 
    ----------
    -- Clip --
