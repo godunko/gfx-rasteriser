@@ -15,7 +15,8 @@ project GFX_Rasteriser is
      "../.objs/" & GFX_Rasteriser_Config.Build_Profile & GFX_Common.Object_Dir_Suffix;
 
    package Compiler is
-      for Switches ("Ada") use GFX_Rasteriser_Config.Ada_Compiler_Switches;
+      for Switches ("Ada") use GFX_Rasteriser_Config.Ada_Compiler_Switches
+        & ("-gnaty-B");  --  check no use of AND/OR for boolean expressions (off)
    end Compiler;
 
 end GFX_Rasteriser;
