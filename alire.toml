@@ -8,8 +8,6 @@ maintainers-logins = ["godunko"]
 licenses = "Apache-2.0 WITH LLVM-exception"
 tags = ["graphics"]
 
-project-files = ["gnat/gfx_rasteriser.gpr"]
-
 [configuration]
 generate_ada = false
 generate_c = false
