@@ -8,8 +8,6 @@ pragma Restrictions (No_Elaboration_Code);
 
 package body GFX.Implementation.Subpixel_Operations is
 
-   use GFX.Implementation.Fixed_Types;
-
    -----------------------
    -- Pixel_Upper_Bound --
    -----------------------

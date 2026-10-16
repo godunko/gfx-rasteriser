@@ -151,6 +151,11 @@ is
 
    function Floor (Item : Fixed_16) return Fixed_16;
 
+   function Floor (Item : Fixed_16) return GX_Integer;
+   --  Return the greatest integer less than or equal to `Item`, rounding
+   --  toward negative infinity. For example, 1.25 yields 1 and -1.25 yields
+   --  -2; integral values are unchanged.
+
    function Pixel_Lower_Bound (Item : Fixed_16) return Fixed_16;
 
    function Pixel_Upper_Bound (Item : Fixed_16) return Fixed_16;
@@ -190,6 +195,10 @@ private
    Fixed_16_Last        : constant Fixed_16 := Fixed_16'Last;
    Fixed_16_Scale_I     : constant := 2 ** 16;
 
+   function As_GX_Integer is
+     new Ada.Unchecked_Conversion (GX_Unsigned, GX_Integer);
+   function As_GX_Unsigned is
+     new Ada.Unchecked_Conversion (Fixed_16, GX_Unsigned);
    function As_GX_Unsigned is
      new Ada.Unchecked_Conversion (GX_Integer, GX_Unsigned);
    function As_Fixed_16 is
@@ -246,6 +255,9 @@ private
    overriding function "-"
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
        (Fixed_16 (Integer (Left) - Integer (Right)));
+
+   function Floor (Item : Fixed_16) return GX_Integer is
+     (As_GX_Integer (Shift_Right_Arithmetic (As_GX_Unsigned (Item), 16)));
 
    function To_Fixed_16
      (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16 is

@@ -22,4 +22,19 @@ is
    --  Return the exclusive upper boundary of the given pixel (equal to
    --  inclusive lower bound of the next pixel).
 
+   function To_Pixel
+     (Item : GFX.Implementation.Fixed_Types.Fixed_16)
+      return GFX.Rasteriser.Device_Pixel_Index;
+   --  Return the index of the pixel containing the given coordinate,
+   --  rounding toward negative infinity. Pixel N contains coordinates in
+   --  [N, N + 1); for example, -0.25 belongs to pixel -1.
+
+private
+
+   use GFX.Implementation.Fixed_Types;
+
+   function To_Pixel
+     (Item : GFX.Implementation.Fixed_Types.Fixed_16)
+      return GFX.Rasteriser.Device_Pixel_Index is (Floor (Item));
+
 end GFX.Implementation.Subpixel_Operations;
