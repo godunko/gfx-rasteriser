@@ -177,6 +177,8 @@ is
    --
    --  They are listed in alphabetical order intentionally.
 
+   function "/" (Left : Fixed_12; Right : GX_Integer) return Fixed_12;
+
    function Floor (Item : Fixed_16) return GX_Integer;
    --  Return the greatest integer less than or equal to `Item`, rounding
    --  toward negative infinity. For example, 1.25 yields 1 and -1.25 yields
@@ -222,6 +224,9 @@ private
    overriding function "-"
      (Left : Fixed_6; Right : Fixed_6) return Fixed_6 is
        (Fixed_6 (GX_Integer (Left) - GX_Integer (Right)));
+
+   function "/" (Left : Fixed_12; Right : GX_Integer) return Fixed_12 is
+      (Fixed_12 (GX_Integer (Left) / Right));
 
    function "*" (Left : Fixed_6; Right : Fixed_6) return Fixed_12 is
      (Fixed_12 (GX_Integer (Left) * GX_Integer (Right)));
