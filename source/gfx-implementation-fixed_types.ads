@@ -87,10 +87,6 @@ is
    --  Divide Left by Right, return GX_Integer'First/GX_Integer'Last on
    --  overflow.
 
-   function Min (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
-
-   function Max (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
-
    function Is_Equal_Fixed_6
      (Left  : GFX.Rasteriser.Device_Pixel_Coordinate;
       Right : GFX.Rasteriser.Device_Pixel_Coordinate) return Boolean;
@@ -151,11 +147,6 @@ is
 
    function Floor (Item : Fixed_16) return Fixed_16;
 
-   function Floor (Item : Fixed_16) return GX_Integer;
-   --  Return the greatest integer less than or equal to `Item`, rounding
-   --  toward negative infinity. For example, 1.25 yields 1 and -1.25 yields
-   --  -2; integral values are unchanged.
-
    function Pixel_Lower_Bound (Item : Fixed_16) return Fixed_16;
 
    function Pixel_Upper_Bound (Item : Fixed_16) return Fixed_16;
@@ -179,6 +170,23 @@ is
 
    function Truncate (Item : Fixed_16) return Fixed_6;
    --  Reduce precision to six fractional bits, truncating toward zero.
+
+   --  XXX Subprograms below are known used for "new" code with new coordinate
+   --  system conventions. Other subprograms might be used too, need to be
+   --  checked.
+   --
+   --  They are listed in alphabetical order intentionally.
+
+   function Floor (Item : Fixed_16) return GX_Integer;
+   --  Return the greatest integer less than or equal to `Item`, rounding
+   --  toward negative infinity. For example, 1.25 yields 1 and -1.25 yields
+   --  -2; integral values are unchanged.
+
+   function Max (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
+   --  Return the larger of Left and Right.
+
+   function Min (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
+   --  Return the smaller of Left and Right.
 
 private
 
@@ -258,6 +266,12 @@ private
 
    function Floor (Item : Fixed_16) return GX_Integer is
      (As_GX_Integer (Shift_Right_Arithmetic (As_GX_Unsigned (Item), 16)));
+
+   function Max (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
+     (Fixed_16 (GX_Integer'Max (GX_Integer (Left), GX_Integer (Right))));
+
+   function Min (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
+     (Fixed_16 (GX_Integer'Min (GX_Integer (Left), GX_Integer (Right))));
 
    function To_Fixed_16
      (Item : GFX.Rasteriser.Device_Pixel_Index) return Fixed_16 is

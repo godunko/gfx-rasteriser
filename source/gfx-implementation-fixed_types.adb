@@ -192,24 +192,6 @@ package body GFX.Implementation.Fixed_Types is
       return To_Fixed_16 (To_Unsigned (Item) and 16#FFFF#) + 1;
    end Left_Coverage;
 
-   ---------
-   -- Max --
-   ---------
-
-   function Max (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
-   begin
-      return Fixed_16 (GX_Integer'Max (GX_Integer (Left), GX_Integer (Right)));
-   end Max;
-
-   ---------
-   -- Min --
-   ---------
-
-   function Min (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
-   begin
-      return Fixed_16 (GX_Integer'Min (GX_Integer (Left), GX_Integer (Right)));
-   end Min;
-
    -----------------------
    -- Multiply_Coverage --
    -----------------------
