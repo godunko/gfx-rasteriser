@@ -196,6 +196,8 @@ is
 
    function "/" (Left : Fixed_12; Right : GX_Integer) return Fixed_12;
 
+   function Floor (Item : Fixed_16) return Fixed_6;
+
    function Floor (Item : Fixed_16) return GX_Integer;
    --  Return the greatest integer less than or equal to `Item`, rounding
    --  toward negative infinity. For example, 1.25 yields 1 and -1.25 yields
@@ -306,6 +308,10 @@ private
    overriding function "-"
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
        (Fixed_16 (Integer (Left) - Integer (Right)));
+
+   function Floor (Item : Fixed_16) return Fixed_6 is
+     (Fixed_6
+        (As_GX_Integer (Shift_Right_Arithmetic (As_GX_Unsigned (Item), 10))));
 
    function Floor (Item : Fixed_16) return GX_Integer is
      (As_GX_Integer (Shift_Right_Arithmetic (As_GX_Unsigned (Item), 16)));
