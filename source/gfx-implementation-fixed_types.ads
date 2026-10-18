@@ -227,6 +227,19 @@ is
    --
    --  The implementation uses 64-bit integer arithmetic.
 
+   function Multiply_Scaled
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16
+     with
+       Pre => Ghost.Is_In_Range (Right, Zero, One),
+       Post =>
+         Ghost.Is_Truncated_Saturated_Product
+           (Left, Right, Multiply_Scaled'Result);
+   --  Return the product, truncated toward zero.
+   --
+   --  The implementation uses 64-bit integer arithmetic. With `Right` in the
+   --  range `[0.0, 1.0]`, the intermediate product fits in 64 bits, and the
+   --  scaled result fits in `Fixed_16` without saturation.
+
    package Ghost with Ghost is
 
       --  Predicates use widened integer arithmetic to specify truncation
@@ -238,6 +251,12 @@ is
       function Is_Truncated_Saturated_Quotient
         (Left, Right, Result : Fixed_16) return Boolean;
       --  Return `False` for zero divided by zero: no normal result exists.
+
+      function Is_In_Range
+        (Value : Fixed_16;
+         Lower : Fixed_16;
+         Upper : Fixed_16) return Boolean;
+      --  Check that given value is in given range, both bounds inclusive.
 
    end Ghost;
 

@@ -30,6 +30,15 @@ package body GFX.Implementation.Fixed_Types is
 
    package body Ghost is
 
+      -----------------
+      -- Is_In_Range --
+      -----------------
+
+      function Is_In_Range
+        (Value : Fixed_16;
+         Lower : Fixed_16;
+         Upper : Fixed_16) return Boolean is (Value in Lower .. Upper);
+
       ------------------
       -- Is_Saturated --
       ------------------
@@ -282,6 +291,22 @@ package body GFX.Implementation.Fixed_Types is
          return Fixed_16 (Aux);
       end if;
    end Multiply_Saturated;
+
+   ---------------------
+   -- Multiply_Scaled --
+   ---------------------
+
+   function Multiply_Scaled
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16
+   is
+      pragma Suppress (Range_Check);
+      pragma Suppress (Overflow_Check);
+      --  Range check is impossible due to precondition on `Right` parameter.
+
+   begin
+      return
+        Fixed_16 ((GX_Integer_2 (Left) * GX_Integer_2 (Right)) / (2 ** 16));
+   end Multiply_Scaled;
 
    ------------------
    -- Pixel_Bounds --
