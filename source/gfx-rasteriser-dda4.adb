@@ -22,10 +22,6 @@ package body GFX.Rasteriser.DDA4 is
    use GFX.Implementation.Fixed_Types;
    use GFX.Implementation.Subpixel_Operations;
 
-   Rendering_Area     : GFX.Implementation.Clipping.GF_Clipping_Rectangle;
-   --  Clip_X_Lower_Bound : Fixed_16;
-   --  Empty_Area : Boolean := True;
-
    type Vertex is record
       X      : Fixed_16;
       Y      : Fixed_16;
@@ -39,13 +35,6 @@ package body GFX.Rasteriser.DDA4 is
 
    type Vertex_Array is array (Positive range <>) of Vertex;
 
-   type Cell_Coverage is record
-      Coverage   : Fixed_6;
-      --  Vertical height of the line inside the cell.
-      Twice_Area : Fixed_12;
-      --  Twice the signed area of the trapezoid matching the right edge.
-   end record;
-
    type Row_Cursor is record
       Segment      : Natural := 0;
       --  Zero means that the chain is exhausted.
@@ -54,6 +43,67 @@ package body GFX.Rasteriser.DDA4 is
       --  First unconsumed point, possibly inside the first row.
       At_Row_Upper : Fixed_16 := Zero;
       --  Valid only when this segment extends below the current row.
+   end record;
+
+   package Ghost is
+
+      --  Provides functions to makes predicates more readable.
+
+      function Has_Nondecreasing_Y (Chain : Vertex_Array) return Boolean is
+        (for all Index in Chain'First .. Chain'Last - 1 =>
+            Chain (Index).Y <= Chain (Index + 1).Y);
+      --  Horizontal segments are permitted. They represent the top or bottom
+      --  end of an axis-aligned or clipped rectangle.
+
+      function Has_Unique_Coordinates (Chain : Vertex_Array) return Boolean is
+        (for all Left_Index in Chain'Range =>
+           (for all Right_Index in Chain'Range =>
+              Left_Index = Right_Index
+                or else Chain (Left_Index).X /= Chain (Right_Index).X
+                or else Chain (Left_Index).Y /= Chain (Right_Index).Y));
+      --  No two vertices denote the same point. Equal X or equal Y coordinates
+      --  alone are valid for vertical and horizontal segments.
+
+   end Ghost;
+
+   procedure Rasterize_Contour
+     (Left      : Vertex_Array;
+      Right     : Vertex_Array;
+      Fill_Span : not null access procedure
+        (X        : Device_Pixel_Index;
+         Y        : Device_Pixel_Index;
+         Width    : Device_Pixel_Count;
+         Coverage : Grayscale))
+     with Pre =>
+       Left'Length in 2 .. 4 and Right'Length in 2 .. 4
+       --  Both vertex lists contain at least one edge.
+       and Ghost.Has_Nondecreasing_Y (Left)
+       and Ghost.Has_Nondecreasing_Y (Right)
+       --  Vertices in both chains are ordered from top to bottom. Strict
+       --  ordering is not required because a chain may contain a horizontal
+       --  rectangle end segment.
+       and Ghost.Has_Unique_Coordinates (Left)
+       and Ghost.Has_Unique_Coordinates (Right)
+       --  Repeated points would create zero-length segments.
+       and Left (Left'First).Y = Right (Right'First).Y
+       and Left (Left'Last).Y = Right (Right'Last).Y
+       --  Top and bottom segments between left and right edge lists are
+       --  horizontal.
+       and Left (Left'Last).Y > Left (Left'First).Y;
+
+   procedure Initialize_Row_Cursor
+     (Chain     : Vertex_Array;
+      Row_Upper : Fixed_16;
+      Cursor    : out Row_Cursor);
+   --  Initialize once before the first row; skip leading horizontal edges.
+
+   Rendering_Area : GFX.Implementation.Clipping.GF_Clipping_Rectangle;
+
+   type Cell_Coverage is record
+      Coverage   : Fixed_6;
+      --  Vertical height of the line inside the cell.
+      Twice_Area : Fixed_12;
+      --  Twice the signed area of the trapezoid matching the right edge.
    end record;
 
    type Segment_DDA is record
@@ -98,12 +148,6 @@ package body GFX.Rasteriser.DDA4 is
       Change_Column  : GX_Integer := GX_Integer'Last;
       --  Nearest pending activation or active segment's final cell.
    end record;
-
-   procedure Initialize_Row_Cursor
-     (Chain     : Vertex_Array;
-      Row_Upper : Fixed_16;
-      Cursor    : out Row_Cursor);
-   --  Initialize once before the first row; skip leading horizontal edges.
 
    procedure Prepare_Row
      (Left           : Vertex_Array;
@@ -1026,17 +1070,6 @@ package body GFX.Rasteriser.DDA4 is
    -----------------------
 
    procedure Rasterize_Contour
-     (Left      : Vertex_Array;
-      Right     : Vertex_Array;
-      Fill_Span : not null access procedure
-        (X        : Device_Pixel_Index;
-         Y        : Device_Pixel_Index;
-         Width    : Device_Pixel_Count;
-         Coverage : Grayscale))
-     with Pre => Left'Length in 2 .. 4 and Right'Length in 2 .. 4,
-       Export;
-
-   procedure Rasterize_Contour
      (Left, Right : Vertex_Array;
       Fill_Span : not null access procedure
         (X        : Device_Pixel_Index;
@@ -1170,13 +1203,6 @@ package body GFX.Rasteriser.DDA4 is
       end Draw_Interior;
 
    begin
-      pragma Assert (Left (Left'First).Y = Right (Right'First).Y);
-      pragma Assert (Left (Left'Last).Y = Right (Right'Last).Y);
-
-      if Left (Left'Last).Y <= Left (Left'First).Y then
-         return;
-      end if;
-
       Initialize_Row_Cursor (Left, Row_Upper, Left_Cursor);
       Initialize_Row_Cursor (Right, Row_Upper, Right_Cursor);
 
