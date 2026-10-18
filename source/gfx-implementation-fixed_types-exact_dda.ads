@@ -24,16 +24,17 @@ is
 
    type Slope is private;
    --  Exact slope Delta_Out / Delta_In. Objects are not initialized by
-   --  default to avoid overhead, see To_Slope.
+   --  default to avoid overhead, see Initialize.
 
    type Coordinate is private;
    --  Exact coordinate on the "out" axis. Its remainder is relative to
    --  Delta_In of the slope which has been used to compute it. Objects are
    --  not initialized by default to avoid overhead, see To_Coordinate.
 
-   function To_Slope
-     (Delta_Out : Fixed_16;
-      Delta_In  : Fixed_16) return Slope
+   procedure Initialize
+     (Self      : out Slope;
+      Delta_Out : Fixed_16;
+      Delta_In  : Fixed_16)
      with Pre => Delta_In >= Zero;
    --  Both deltas must be on the 1/64 subpixel grid. When Delta_In is zero
    --  the slope can't be used to compute coordinates; when it is less than
@@ -47,14 +48,16 @@ is
      with Inline;
    --  Return value rounded toward negative infinity.
 
-   function At_Offset
-     (Origin  : Fixed_16;
+   procedure At_Offset
+     (Self    : out Coordinate;
+      Origin  : Fixed_16;
       Through : Slope;
-      Offset  : Fixed_16) return Coordinate
+      Offset  : Fixed_16)
      with Pre => Offset >= Zero and Offset <= One;
-   --  Return Origin + Offset * Delta_Out / Delta_In: the "out" coordinate of
-   --  the point at Offset along the "in" axis from the point with exact
-   --  "out" coordinate Origin. Offset must be on the 1/64 subpixel grid.
+   --  Set Self to Origin + Offset * Delta_Out / Delta_In: the "out"
+   --  coordinate of the point at Offset along the "in" axis from the point
+   --  with exact "out" coordinate Origin. Offset must be on the 1/64
+   --  subpixel grid.
 
    procedure Step (Self : in out Coordinate; Through : Slope)
      with Inline;
@@ -66,15 +69,17 @@ is
    --  Move coordinate back by one pixel along the "in" axis. Delta_In must
    --  be at least one pixel.
 
-   function Cross
-     (Out_Origin : Fixed_16;
+   procedure Cross
+     (Self       : out Coordinate;
+      Out_Origin : Fixed_16;
       In_Origin  : Coordinate;
       Through    : Slope;
-      In_Value   : Fixed_16) return Coordinate
+      In_Value   : Fixed_16)
      with Pre => In_Value - Value (In_Origin) >= Zero
                    and In_Value - Value (In_Origin) <= One;
-   --  Return the "out" coordinate of the point with the given exact "in"
-   --  coordinate, on the line through the point (In_Origin, Out_Origin).
+   --  Set Self to the "out" coordinate of the point with the given exact
+   --  "in" coordinate, on the line through the point (In_Origin,
+   --  Out_Origin).
    --
    --  In_Origin is an exact coordinate computed with the inverse slope of
    --  the same line, so its remainder is relative to abs Delta_Out of

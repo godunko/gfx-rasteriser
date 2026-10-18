@@ -42,13 +42,13 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
    -- At_Offset --
    ---------------
 
-   function At_Offset
-     (Origin  : Fixed_16;
+   procedure At_Offset
+     (Self    : out Coordinate;
+      Origin  : Fixed_16;
       Through : Slope;
-      Offset  : Fixed_16) return Coordinate
+      Offset  : Fixed_16)
    is
-      Quotient  : GX_Integer;
-      Remainder : GX_Integer;
+      Quotient : GX_Integer;
 
    begin
       Divide
@@ -57,20 +57,20 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
          0,
          Through.Denominator,
          Quotient,
-         Remainder);
-
-      return (Value => Origin + Fixed_16 (Quotient), Error => Remainder);
+         Self.Error);
+      Self.Value := Origin + Fixed_16 (Quotient);
    end At_Offset;
 
    -----------
    -- Cross --
    -----------
 
-   function Cross
-     (Out_Origin : Fixed_16;
+   procedure Cross
+     (Self       : out Coordinate;
+      Out_Origin : Fixed_16;
       In_Origin  : Coordinate;
       Through    : Slope;
-      In_Value   : Fixed_16) return Coordinate
+      In_Value   : Fixed_16)
    is
       --  The exact "in" coordinate of the origin is
       --  In_Origin.Value + In_Origin.Error / abs Delta_Out, thus the
@@ -78,8 +78,7 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       --  (In_Value - In_Origin.Value) * Delta_Out
       --    - In_Origin.Error * sign (Delta_Out).
 
-      Quotient  : GX_Integer;
-      Remainder : GX_Integer;
+      Quotient : GX_Integer;
 
    begin
       Divide
@@ -90,9 +89,8 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
           else -In_Origin.Error),
          Through.Denominator,
          Quotient,
-         Remainder);
-
-      return (Value => Out_Origin + Fixed_16 (Quotient), Error => Remainder);
+         Self.Error);
+      Self.Value := Out_Origin + Fixed_16 (Quotient);
    end Cross;
 
    ------------
@@ -151,6 +149,39 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       end if;
    end Divide;
 
+   ----------------
+   -- Initialize --
+   ----------------
+
+   procedure Initialize
+     (Self      : out Slope;
+      Delta_Out : Fixed_16;
+      Delta_In  : Fixed_16)
+   is
+      Lift : GX_Integer;
+
+   begin
+      Self.Delta_Out   := Subpixels (Delta_Out);
+      Self.Denominator := Subpixels (Delta_In);
+
+      if Self.Denominator >= Pixel_Scale / Subpixel_Scale then
+         --  Step is used only when Delta_In is at least one pixel.
+
+         Divide
+           (Pixel_Scale,
+            Self.Delta_Out,
+            0,
+            Self.Denominator,
+            Lift,
+            Self.Remainder);
+         Self.Lift := Fixed_16 (Lift);
+
+      else
+         Self.Lift      := 0;
+         Self.Remainder := 0;
+      end if;
+   end Initialize;
+
    ----------
    -- Step --
    ----------
@@ -180,37 +211,5 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
          Self.Error := Self.Error + Through.Denominator;
       end if;
    end Step_Back;
-
-   --------------
-   -- To_Slope --
-   --------------
-
-   function To_Slope
-     (Delta_Out : Fixed_16;
-      Delta_In  : Fixed_16) return Slope
-   is
-      Result : Slope :=
-        (Delta_Out   => Subpixels (Delta_Out),
-         Denominator => Subpixels (Delta_In),
-         Lift        => 0,
-         Remainder   => 0);
-      Lift   : GX_Integer;
-
-   begin
-      if Result.Denominator >= Pixel_Scale / Subpixel_Scale then
-         --  Step is used only when Delta_In is at least one pixel.
-
-         Divide
-           (Pixel_Scale,
-            Result.Delta_Out,
-            0,
-            Result.Denominator,
-            Lift,
-            Result.Remainder);
-         Result.Lift := Fixed_16 (Lift);
-      end if;
-
-      return Result;
-   end To_Slope;
 
 end GFX.Implementation.Fixed_Types.Exact_DDA;
