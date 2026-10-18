@@ -136,15 +136,48 @@ package body GFX.Rasteriser.DDA4 is
    --  equal, keep the single column containing the vertical portion; on a
    --  boundary, this is the column to its right.
 
-   procedure Accumulate_Interior
+   type Interior_DDA is record
+      At_Column_Upper : Fixed_16 := Zero;
+      Floor_Upper     : Fixed_6  := Zero;
+      --  Last right-boundary intersection and its value floored to the
+      --  subpixel grid.
+      Step            : Fixed_16 := Zero;
+      Y_Top           : Fixed_16 := Zero;
+      Y_Bottom        : Fixed_16 := Zero;
+      Negate          : Boolean  := False;
+      --  Sign of the contribution, see Load.
+   end record;
+   --  State of a portion while it crosses interior cells only. It contains
+   --  just the values used by the pixel loop, so they can be kept in
+   --  registers.
+
+   procedure Load
      (Chain    : Vertex_Array;
-      Part     : in out Segment_DDA;
+      Part     : Segment_DDA;
       Reversed : Boolean;
-      Coverage : in out Cell_Coverage);
-   --  Advance Part's column intersections by one pixel and add its signed
-   --  height and twice-area to Coverage. Both boundaries of the new cell
-   --  must intersect the same segment, with no endpoint or activation event
-   --  in this cell. Reversed traverses the segment against chain order.
+      State    : out Interior_DDA)
+     with Inline_Always;
+   --  Initialize State from Part. Reversed traverses the segment against
+   --  chain order.
+
+   procedure Advance (State : in out Interior_DDA; Height : in out Fixed_6)
+     with Inline_Always;
+   --  Advance column intersections by one pixel and add the signed height of
+   --  the portion inside the new cell to Height. Both boundaries of the new
+   --  cell must intersect the same segment, with no endpoint or activation
+   --  event in this cell.
+
+   procedure Store (State : Interior_DDA; Part : in out Segment_DDA)
+     with Inline_Always;
+   --  Save the right-boundary intersection back to Part. At_Column_Lower is
+   --  not updated: every later use of Part first assigns it from
+   --  At_Column_Upper.
+
+   function Interior_Alpha
+     (Accumulator : Fixed_6; Height : Fixed_6) return Grayscale
+     with Inline_Always;
+   --  Equivalent to Integrate for a cell whose boundaries are crossed by
+   --  portions only; the twice-area of such a cell is Height * One.
 
    --  Initialize once before the first row.
 
@@ -276,39 +309,24 @@ package body GFX.Rasteriser.DDA4 is
         @ + Delta_Y * Floor ((Column_Upper - X_1) + (Column_Upper - X_2));
    end Accumulate;
 
-   -------------------------
-   -- Accumulate_Interior --
-   -------------------------
+   -------------
+   -- Advance --
+   -------------
 
-   procedure Accumulate_Interior
-     (Chain    : Vertex_Array;
-      Part     : in out Segment_DDA;
-      Reversed : Boolean;
-      Coverage : in out Cell_Coverage)
+   procedure Advance (State : in out Interior_DDA; Height : in out Fixed_6)
    is
-      Delta_Y : Fixed_6;
+      Lower       : constant Fixed_16 := State.At_Column_Upper;
+      Floor_Lower : constant Fixed_6  := State.Floor_Upper;
+      Delta_Y     : Fixed_6;
 
    begin
-      --  Both cell boundaries intersect this segment. Membership and
-      --  endpoint checks are performed only in columns where states change.
+      State.At_Column_Upper := Lower
+        + Max (State.Y_Top - Lower, Min (State.Y_Bottom - Lower, State.Step));
+      State.Floor_Upper := Floor (State.At_Column_Upper);
+      Delta_Y := State.Floor_Upper - Floor_Lower;
 
-      Step_Column (Part, Chain (Part.Segment).Step_Y);
-
-      Delta_Y := Floor (Part.At_Column_Upper) - Floor (Part.At_Column_Lower);
-
-      --  The difference follows increasing X. Reverse its sign when the
-      --  contour traverses this portion from right to left.
-      if not ((Part.X_Top < Part.X_Bottom) xor Reversed) then
-         Delta_Y := Zero - Delta_Y;
-      end if;
-
-      --  The endpoints lie on opposite cell boundaries, so the factor
-      --  (Column_Upper - X_1) + (Column_Upper - X_2) is exactly one pixel.
-      --  Multiplying by Fixed_6 One converts the signed height to Fixed_12
-      --  twice-area units, preserving the rounding used by Accumulate.
-      Coverage.Coverage   := @ + Delta_Y;
-      Coverage.Twice_Area := @ + Delta_Y * One;
-   end Accumulate_Interior;
+      Height := (if State.Negate then @ - Delta_Y else @ + Delta_Y);
+   end Advance;
 
    ---------------------------
    -- Belongs_To_Same_Pixel --
@@ -360,6 +378,20 @@ package body GFX.Rasteriser.DDA4 is
    end Integrate;
 
    --------------------
+   -- Interior_Alpha --
+   --------------------
+
+   function Interior_Alpha
+     (Accumulator : Fixed_6; Height : Fixed_6) return Grayscale
+   is
+      Twice_Area : constant Fixed_12 := (2 * Accumulator + Height) * One;
+      --  Always even, so halving it is exact.
+
+   begin
+      return Grayscale (Integral (255 * abs Twice_Area / 2));
+   end Interior_Alpha;
+
+   --------------------
    -- Is_Upper_Bound --
    --------------------
 
@@ -374,6 +406,36 @@ package body GFX.Rasteriser.DDA4 is
 
       return A = To_Fixed_16 (To_Pixel (A));
    end Is_Upper_Bound;
+
+   ----------
+   -- Load --
+   ----------
+
+   procedure Load
+     (Chain    : Vertex_Array;
+      Part     : Segment_DDA;
+      Reversed : Boolean;
+      State    : out Interior_DDA) is
+   begin
+      State :=
+        (At_Column_Upper => Part.At_Column_Upper,
+         Floor_Upper     => Floor (Part.At_Column_Upper),
+         Step            => Chain (Part.Segment).Step_Y,
+         Y_Top           => Part.Y_Top,
+         Y_Bottom        => Part.Y_Bottom,
+         --  The difference follows increasing X. Reverse its sign when the
+         --  contour traverses this portion from right to left.
+         Negate          => not ((Part.X_Top < Part.X_Bottom) xor Reversed));
+   end Load;
+
+   -----------
+   -- Store --
+   -----------
+
+   procedure Store (State : Interior_DDA; Part : in out Segment_DDA) is
+   begin
+      Part.At_Column_Upper := State.At_Column_Upper;
+   end Store;
 
    --------------------
    -- Column_Portion --
@@ -429,6 +491,8 @@ package body GFX.Rasteriser.DDA4 is
       return Origin + Max (Part.Y_Top - Origin,
         Min (Part.Y_Bottom - Origin, Offset));
    end Intersection_Y;
+
+   pragma Inline (Intersection_Y);
 
    -------------------
    -- Update_Change --
@@ -853,6 +917,8 @@ package body GFX.Rasteriser.DDA4 is
       end if;
    end Accumulate_Portion;
 
+   pragma Inline (Accumulate_Portion);
+
    -----------------
    -- Step_Column --
    -----------------
@@ -999,12 +1065,8 @@ package body GFX.Rasteriser.DDA4 is
       Accumulator  : Fixed_6;
       Alpha        : Grayscale;
 
-      procedure Emit (Width : Device_Pixel_Count := 1);
-      procedure Add_None;
-      procedure Add_Left_One;
-      procedure Add_Left_Two;
-      procedure Add_Right_One;
-      procedure Add_Right_Two;
+      procedure Emit (Width : Device_Pixel_Count := 1)
+        with Inline_Always;
 
       ----------
       -- Emit --
@@ -1019,64 +1081,121 @@ package body GFX.Rasteriser.DDA4 is
          end if;
       end Emit;
 
-      procedure Add_None is
-      begin
-         null;
-      end Add_None;
-
-      procedure Add_Left_One is
-      begin
-         Accumulate_Interior (Left, Left_Side.Top_Segment,
-           True, Coverage);
-      end Add_Left_One;
-
-      procedure Add_Left_Two is
-      begin
-         Add_Left_One;
-         Accumulate_Interior (Left, Left_Side.Bottom_Segment,
-           True, Coverage);
-      end Add_Left_Two;
-
-      procedure Add_Right_One is
-      begin
-         Accumulate_Interior (Right, Right_Side.Top_Segment,
-           False, Coverage);
-      end Add_Right_One;
-
-      procedure Add_Right_Two is
-      begin
-         Add_Right_One;
-         Accumulate_Interior (Right, Right_Side.Bottom_Segment,
-           False, Coverage);
-      end Add_Right_Two;
-
       generic
-         with procedure Add_Left;
-         with procedure Add_Right;
-      procedure Draw_Run (Last : GX_Integer);
+         Left_Count  : Natural;
+         Right_Count : Natural;
+         --  Number of active portions on each side, 0 .. 2.
+      procedure Draw_Run
+        (Last         : GX_Integer;
+         Left_Top     : in out Segment_DDA;
+         Left_Bottom  : in out Segment_DDA;
+         Right_Top    : in out Segment_DDA;
+         Right_Bottom : in out Segment_DDA);
+      --  Draw interior cells Column .. Last. Both boundaries of each cell
+      --  intersect every active portion, so each portion contributes exactly
+      --  one DDA step per cell. All loop state is kept in local variables to
+      --  let the compiler allocate it to registers; portions are loaded once
+      --  before and stored once after the loop.
 
-      procedure Draw_Run (Last : GX_Integer) is
+      procedure Draw_Run
+        (Last         : GX_Integer;
+         Left_Top     : in out Segment_DDA;
+         Left_Bottom  : in out Segment_DDA;
+         Right_Top    : in out Segment_DDA;
+         Right_Bottom : in out Segment_DDA)
+      is
+         pragma Warnings (Off, "*is not referenced*");
+         pragma Warnings (Off, "*not modified*");
+         --  Unused portions depend on the instantiation.
+
+         Left_1  : Interior_DDA;
+         Left_2  : Interior_DDA;
+         Right_1 : Interior_DDA;
+         Right_2 : Interior_DDA;
+
+         Current : GX_Integer := Column;
+         Acc     : Fixed_6    := Accumulator;
+         Y       : constant GX_Integer := Row;
+         Height  : Fixed_6;
+         Value   : Grayscale;
+
       begin
-         while Column <= Last loop
-            Coverage := (Zero, Zero);
-            Add_Left;
-            Add_Right;
-            Emit;
-            Column := @ + 1;
-            Column_Upper := @ + One;
+         if Left_Count >= 1 then
+            Load (Left, Left_Top, True, Left_1);
+         end if;
+
+         if Left_Count >= 2 then
+            Load (Left, Left_Bottom, True, Left_2);
+         end if;
+
+         if Right_Count >= 1 then
+            Load (Right, Right_Top, False, Right_1);
+         end if;
+
+         if Right_Count >= 2 then
+            Load (Right, Right_Bottom, False, Right_2);
+         end if;
+
+         while Current <= Last loop
+            Height := Zero;
+
+            if Left_Count >= 1 then
+               Advance (Left_1, Height);
+            end if;
+
+            if Left_Count >= 2 then
+               Advance (Left_2, Height);
+            end if;
+
+            if Right_Count >= 1 then
+               Advance (Right_1, Height);
+            end if;
+
+            if Right_Count >= 2 then
+               Advance (Right_2, Height);
+            end if;
+
+            Value := Interior_Alpha (Acc, Height);
+            Acc   := @ + Height;
+
+            if Value /= 0 then
+               Fill_Span (Current, Y, 1, Value);
+            end if;
+
+            Current := @ + 1;
          end loop;
+
+         Column       := Current;
+         Column_Upper := Pixel_Lower_Bound (Column) + One;
+         Accumulator  := Acc;
+
+         if Left_Count >= 1 then
+            Store (Left_1, Left_Top);
+         end if;
+
+         if Left_Count >= 2 then
+            Store (Left_2, Left_Bottom);
+         end if;
+
+         if Right_Count >= 1 then
+            Store (Right_1, Right_Top);
+         end if;
+
+         if Right_Count >= 2 then
+            Store (Right_2, Right_Bottom);
+         end if;
       end Draw_Run;
 
       --  Choose a specialized loop once per range. No membership or active
       --  segment count checks occur inside these pixel loops.
-      procedure Draw_01 is new Draw_Run (Add_None, Add_Right_One);
-      procedure Draw_02 is new Draw_Run (Add_None, Add_Right_Two);
-      procedure Draw_10 is new Draw_Run (Add_Left_One, Add_None);
-      procedure Draw_11 is new Draw_Run (Add_Left_One, Add_Right_One);
-      procedure Draw_12 is new Draw_Run (Add_Left_One, Add_Right_Two);
-      procedure Draw_20 is new Draw_Run (Add_Left_Two, Add_None);
-      procedure Draw_21 is new Draw_Run (Add_Left_Two, Add_Right_One);
-      procedure Draw_22 is new Draw_Run (Add_Left_Two, Add_Right_Two);
+      procedure Draw_01 is new Draw_Run (0, 1);
+      procedure Draw_02 is new Draw_Run (0, 2);
+      procedure Draw_10 is new Draw_Run (1, 0);
+      procedure Draw_11 is new Draw_Run (1, 1);
+      procedure Draw_12 is new Draw_Run (1, 2);
+      procedure Draw_20 is new Draw_Run (2, 0);
+      procedure Draw_21 is new Draw_Run (2, 1);
+      procedure Draw_22 is new Draw_Run (2, 2);
 
       procedure Draw_Interior (Last : GX_Integer) is
       begin
@@ -1090,27 +1209,43 @@ package body GFX.Rasteriser.DDA4 is
                Column := Last + 1;
                Column_Upper := Pixel_Lower_Bound (Column) + One;
             elsif Right_Side.Bottom_Segment.Segment = 0 then
-               Draw_01 (Last);
+               Draw_01 (Last,
+                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
+                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
             else
-               Draw_02 (Last);
+               Draw_02 (Last,
+                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
+                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
             end if;
 
          elsif Left_Side.Bottom_Segment.Segment = 0 then
             if Right_Side.Top_Segment.Segment = 0 then
-               Draw_10 (Last);
+               Draw_10 (Last,
+                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
+                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
             elsif Right_Side.Bottom_Segment.Segment = 0 then
-               Draw_11 (Last);
+               Draw_11 (Last,
+                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
+                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
             else
-               Draw_12 (Last);
+               Draw_12 (Last,
+                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
+                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
             end if;
 
          else
             if Right_Side.Top_Segment.Segment = 0 then
-               Draw_20 (Last);
+               Draw_20 (Last,
+                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
+                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
             elsif Right_Side.Bottom_Segment.Segment = 0 then
-               Draw_21 (Last);
+               Draw_21 (Last,
+                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
+                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
             else
-               Draw_22 (Last);
+               Draw_22 (Last,
+                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
+                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
             end if;
          end if;
       end Draw_Interior;
@@ -1122,57 +1257,54 @@ package body GFX.Rasteriser.DDA4 is
 
       procedure Draw_Simple_Row is
          Left_Part, Right_Part : Segment_DDA;
+         Left_Unused, Right_Unused : Segment_DDA;
 
-         procedure Add_Left;
-         procedure Add_Right;
          procedure Add_Endpoint
            (Chain    : Vertex_Array;
             Part     : in out Segment_DDA;
             Reversed : Boolean);
          function Next_Endpoint (Part : Segment_DDA) return GX_Integer;
 
-         procedure Add_Left is
-         begin
-            Accumulate_Interior (Left, Left_Part, True, Coverage);
-         end Add_Left;
-
-         procedure Add_Right is
-         begin
-            Accumulate_Interior (Right, Right_Part, False, Coverage);
-         end Add_Right;
-
-         procedure Draw_Left is new Draw_Run (Add_Left, Add_None);
-         procedure Draw_Both is new Draw_Run (Add_Left, Add_Right);
-         procedure Draw_Right is new Draw_Run (Add_None, Add_Right);
+         procedure Draw_Left is new Draw_Run (1, 0);
+         procedure Draw_Both is new Draw_Run (1, 1);
+         procedure Draw_Right is new Draw_Run (0, 1);
 
          procedure Add_Endpoint
            (Chain    : Vertex_Array;
             Part     : in out Segment_DDA;
             Reversed : Boolean)
          is
-            X_Min        : constant Fixed_16 :=
-              Min (Part.X_Top, Part.X_Bottom);
-            X_Max        : constant Fixed_16 :=
-              Max (Part.X_Top, Part.X_Bottom);
-            Column_Lower : constant Fixed_16 := Column_Upper - One;
+            X_Max : constant Fixed_16 := Max (Part.X_Top, Part.X_Bottom);
 
          begin
             if Column not in Part.Column_First .. Part.Column_Last then
                return;
             end if;
 
-            if Column = Part.Column_First then
-               --  Initialize intersections from the original vertex, as in
-               --  the general path. Later columns retain the same DDA steps.
-               if X_Min <= Column_Lower and Column_Lower <= X_Max then
-                  Part.At_Column_Lower :=
-                    Intersection_Y (Chain, Part, Column_Lower);
+            if Part.Column_First = Part.Column_Last then
+               --  The whole portion lies inside this cell, so no column
+               --  boundary intersection is needed.
+
+               if Reversed then
+                  Accumulate (Coverage, Column_Upper,
+                    Part.X_Bottom, Part.Y_Bottom, Part.X_Top, Part.Y_Top);
+               else
+                  Accumulate (Coverage, Column_Upper,
+                    Part.X_Top, Part.Y_Top, Part.X_Bottom, Part.Y_Bottom);
                end if;
 
-               if X_Min <= Column_Upper and Column_Upper <= X_Max then
-                  Part.At_Column_Upper :=
-                    Intersection_Y (Chain, Part, Column_Upper);
-               end if;
+               return;
+            end if;
+
+            if Column = Part.Column_First then
+               --  Initialize the intersection from the original vertex, as
+               --  in the general path. Later columns retain the same DDA
+               --  steps. The portion continues to the next cell, so it
+               --  crosses Column_Upper; X_Min is not less than Column_Lower,
+               --  thus At_Column_Lower is not used in this cell.
+
+               Part.At_Column_Upper :=
+                 Intersection_Y (Chain, Part, Column_Upper);
 
             elsif Column_Upper < X_Max then
                Step_Column (Part, Chain (Part.Segment).Step_Y);
@@ -1221,13 +1353,16 @@ package body GFX.Rasteriser.DDA4 is
 
                elsif Column <= Left_Part.Column_Last then
                   if Column >= Right_Part.Column_First then
-                     Draw_Both (Change - 1);
+                     Draw_Both (Change - 1,
+                       Left_Part, Left_Unused, Right_Part, Right_Unused);
                   else
-                     Draw_Left (Change - 1);
+                     Draw_Left (Change - 1,
+                       Left_Part, Left_Unused, Right_Part, Right_Unused);
                   end if;
 
                elsif Column >= Right_Part.Column_First then
-                  Draw_Right (Change - 1);
+                  Draw_Right (Change - 1,
+                    Left_Part, Left_Unused, Right_Part, Right_Unused);
 
                else
                   --  No boundary crosses this range. Preserve the general
