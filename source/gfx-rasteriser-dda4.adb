@@ -45,6 +45,24 @@ package body GFX.Rasteriser.DDA4 is
       --  Valid only when this segment extends below the current row.
    end record;
 
+   type Segment_DDA is record
+      Segment         : Natural := 0;
+
+      X_Top           : Fixed_16 := Zero;
+      Y_Top           : Fixed_16 := Zero;
+      X_Bottom        : Fixed_16 := Zero;
+      Y_Bottom        : Fixed_16 := Zero;
+      --  Top and bottom endpoints of the segment portion within the current
+      --  row. Each may be an original segment endpoint or an intersection
+      --  with a row boundary.
+
+      At_Column_Lower : Fixed_16 := Zero;
+      At_Column_Upper : Fixed_16 := Zero;
+      --  Valid only if the corresponding boundary intersects this portion.
+      Column_First    : GX_Integer := 0;
+      Column_Last     : GX_Integer := -1;
+   end record;
+
    package Ghost is
 
       --  Provides functions to makes predicates more readable.
@@ -103,6 +121,14 @@ package body GFX.Rasteriser.DDA4 is
          and Ghost.Belongs_To_Pixel_Upper_Bound
                (Chain (Chain'First).Y, Row_Upper);
 
+   procedure Set_Column_Range (Part : in out Segment_DDA);
+   --  Set `Column_First` and `Column_Last` to the inclusive range of pixel
+   --  columns for this portion, regardless of its direction along X. If the
+   --  endpoint X coordinates differ, exclude the column merely touched by
+   --  the rightmost endpoint when it lies on a column boundary. If they are
+   --  equal, keep the single column containing the vertical portion; on a
+   --  boundary, this is the column to its right.
+
    --  Initialize once before the first row.
 
    Rendering_Area : GFX.Implementation.Clipping.GF_Clipping_Rectangle;
@@ -112,20 +138,6 @@ package body GFX.Rasteriser.DDA4 is
       --  Vertical height of the line inside the cell.
       Twice_Area : Fixed_12;
       --  Twice the signed area of the trapezoid matching the right edge.
-   end record;
-
-   type Segment_DDA is record
-      Segment         : Natural := 0;
-      X_Top           : Fixed_16 := Zero;
-      Y_Top           : Fixed_16 := Zero;
-      X_Bottom        : Fixed_16 := Zero;
-      Y_Bottom        : Fixed_16 := Zero;
-      --  Endpoints clipped to the current row, in chain order.
-      At_Column_Lower : Fixed_16 := Zero;
-      At_Column_Upper : Fixed_16 := Zero;
-      --  Valid only if the corresponding boundary intersects this portion.
-      Column_First    : GX_Integer := 0;
-      Column_Last     : GX_Integer := -1;
    end record;
 
    type Segment_Set is mod 2 ** 3;
@@ -322,24 +334,6 @@ package body GFX.Rasteriser.DDA4 is
       return A = To_Fixed_16 (To_Pixel (A));
    end Is_Upper_Bound;
 
-   ----------------------
-   -- Set_Column_Range --
-   ----------------------
-
-   procedure Set_Column_Range (Part : in out Segment_DDA) is
-      X_Min : constant Fixed_16 := Min (Part.X_Top, Part.X_Bottom);
-      X_Max : constant Fixed_16 := Max (Part.X_Top, Part.X_Bottom);
-   begin
-      Part.Column_First := To_Pixel (X_Min);
-      Part.Column_Last := To_Pixel (X_Max);
-
-      if X_Min < X_Max and then Is_Upper_Bound (X_Max) then
-         --  A nonvertical portion ending on a boundary contributes nothing
-         --  to the cell on its right. Vertical portions belong to that cell.
-         Part.Column_Last := @ - 1;
-      end if;
-   end Set_Column_Range;
-
    --------------------
    -- Column_Portion --
    --------------------
@@ -514,53 +508,6 @@ package body GFX.Rasteriser.DDA4 is
          Reversed : Boolean;
          Side     : in out Row_Side);
 
-      procedure Prepare_Side
-        (Chain  : Vertex_Array;
-         Cursor : in out Row_Cursor;
-         Side   : out Row_Side;
-         Part   : out Segment_DDA)
-      is
-         Index : constant Positive := Cursor.Segment;
-         Last  : Vertex renames Chain (Index + 1);
-      begin
-         Part :=
-           (Segment         => Index,
-            X_Top           => Cursor.X,
-            Y_Top           => Row_Lower,
-            X_Bottom        => Cursor.At_Row_Upper,
-            Y_Bottom        => Row_Upper,
-            At_Column_Lower => Zero,
-            At_Column_Upper => Zero,
-            Column_First    => 0,
-            Column_Last     => -1);
-         Set_Column_Range (Part);
-
-         Side := (others => <>);
-         Side.First_Segment := Index;
-         Side.Last_Segment := Index;
-         Side.First_X := Part.X_Top;
-         Side.First_Y := Part.Y_Top;
-         Side.Last_X := Part.X_Bottom;
-         Side.Last_Y := Part.Y_Bottom;
-         Side.Column_First := Part.Column_First;
-         Side.Column_Last := Part.Column_Last;
-
-         Cursor.X := Part.X_Bottom;
-         Cursor.Y := Row_Upper;
-
-         if Row_Upper + One < Last.Y then
-            declare
-               DX : constant Fixed_16 := Last.X - Cursor.X;
-            begin
-               Cursor.At_Row_Upper := Cursor.X
-                 + Max (Min (Zero, DX),
-                     Min (Max (Zero, DX), Chain (Index).Step_X));
-            end;
-         else
-            Cursor.At_Row_Upper := Zero;
-         end if;
-      end Prepare_Side;
-
       procedure Accumulate_First
         (Chain    : Vertex_Array;
          Part     : in out Segment_DDA;
@@ -622,6 +569,50 @@ package body GFX.Rasteriser.DDA4 is
          Update_Change (Side);
       end Accumulate_First;
 
+      ------------------
+      -- Prepare_Side --
+      ------------------
+
+      procedure Prepare_Side
+        (Chain  : Vertex_Array;
+         Cursor : in out Row_Cursor;
+         Side   : out Row_Side;
+         Part   : out Segment_DDA)
+      is
+         Index : constant Positive := Cursor.Segment;
+         Last  : Vertex renames Chain (Index + 1);
+      begin
+         Part :=
+           (Segment         => Index,
+            X_Top           => Cursor.X,
+            Y_Top           => Row_Lower,
+            X_Bottom        => Cursor.At_Row_Upper,
+            Y_Bottom        => Row_Upper,
+            At_Column_Lower => Zero,
+            At_Column_Upper => Zero,
+            Column_First    => 0,
+            Column_Last     => -1);
+         Set_Column_Range (Part);
+
+         Side := (others => <>);
+         Side.First_Segment := Index;
+         Side.Last_Segment := Index;
+         Side.First_X := Part.X_Top;
+         Side.First_Y := Part.Y_Top;
+         Side.Last_X := Part.X_Bottom;
+         Side.Last_Y := Part.Y_Bottom;
+         Side.Column_First := Part.Column_First;
+         Side.Column_Last := Part.Column_Last;
+
+         Cursor.X := Part.X_Bottom;
+         Cursor.Y := Row_Upper;
+
+         Cursor.At_Row_Upper :=
+           (if Row_Upper + One < Last.Y
+            then Cursor.X + Chain (Index).Step_X
+            else Zero);
+      end Prepare_Side;
+
    begin
       Prepare_Side (Left, Left_Cursor, Left_Side, Left_Part);
       Prepare_Side (Right, Right_Cursor, Right_Side, Right_Part);
@@ -671,16 +662,43 @@ package body GFX.Rasteriser.DDA4 is
          Reversed : Boolean;
          Side     : out Row_Side)
       is
-         procedure Prepare_Intersection (Boundary : Fixed_16);
+         procedure Prepare_Intersection (Upper_Bound : Fixed_16)
+           with Pre =>
+             Cursor.Segment in Chain'First .. Chain'Last - 1
+             --  Both endpoints of the current segment exist.
+             and then Cursor.X = Chain (Cursor.Segment).X
+             --  The X displacement is measured from the first vertex.
+             and then Cursor.Y = Chain (Cursor.Segment).Y
+             --  Step_X and the Y displacement use the same origin.
+             and then Is_Upper_Bound (Upper_Bound)
+             --  The intersection lies on an integral row boundary.
+             and then
+               Ghost.Belongs_To_Pixel_Upper_Bound (Cursor.Y, Upper_Bound)
+             --  The positive Y displacement is at most one pixel, as
+             --  required by Multiply_Scaled.
+             and then Upper_Bound < Chain (Cursor.Segment + 1).Y;
+             --  The boundary is inside the segment; its final vertex is
+             --  handled separately by the caller.
+         --  Set Cursor.At_Row_Upper to the X coordinate where the current
+         --  segment intersects the row boundary Upper_Bound. The cursor must
+         --  be at the segment's first vertex, strictly above Upper_Bound and
+         --  at most one pixel away; the segment must end below Upper_Bound.
+         --  Cursor.X, Cursor.Y and Cursor.Segment are left unchanged.
 
-         procedure Prepare_Intersection (Boundary : Fixed_16) is
-            DX : constant Fixed_16 :=
-              Chain (Cursor.Segment + 1).X - Cursor.X;
-            Offset : constant Fixed_16 := Multiply_Saturated
-              (Chain (Cursor.Segment).Step_X, Boundary - Cursor.Y);
+         --------------------------
+         -- Prepare_Intersection --
+         --------------------------
+
+         procedure Prepare_Intersection (Upper_Bound : Fixed_16) is
          begin
+            --  The cursor is at the segment's first vertex, and Upper_Bound
+            --  is inside the segment, at most one pixel below that vertex.
+            --  Truncation toward zero keeps the displacement within the
+            --  segment without clamping.
+
             Cursor.At_Row_Upper := Cursor.X
-              + Max (Min (Zero, DX), Min (Max (Zero, DX), Offset));
+              + Multiply_Scaled
+                  (Chain (Cursor.Segment).Step_X, Upper_Bound - Cursor.Y);
          end Prepare_Intersection;
 
       begin
@@ -698,8 +716,8 @@ package body GFX.Rasteriser.DDA4 is
 
                if Cursor.Y < Row_Upper then
                   Part.Segment := Index;
-                  Part.X_Top := Cursor.X;
-                  Part.Y_Top := Cursor.Y;
+                  Part.X_Top   := Cursor.X;
+                  Part.Y_Top   := Cursor.Y;
 
                   if Row_Upper < Last.Y then
                      Part.X_Bottom := Cursor.At_Row_Upper;
@@ -714,24 +732,26 @@ package body GFX.Rasteriser.DDA4 is
 
                   if Side.First_Segment = 0 then
                      Side.First_Segment := Index;
-                     Side.First_X := Part.X_Top;
-                     Side.First_Y := Part.Y_Top;
-                     Side.Column_First := Part.Column_First;
-                     Side.Column_Last := Part.Column_Last;
+                     Side.First_X       := Part.X_Top;
+                     Side.First_Y       := Part.Y_Top;
+                     Side.Column_First  := Part.Column_First;
+                     Side.Column_Last   := Part.Column_Last;
 
                      if Reversed then
                         --  Only the first left portion can move left. Later
                         --  portions are vertical or move right, so its range
                         --  determines the first cell of this row.
+
                         First_Column := Part.Column_First;
                         Column_Lower := Pixel_Lower_Bound (First_Column);
                         Column_Upper := Column_Lower + One;
                      end if;
+
                   else
-                     Side.Column_First := GX_Integer'Min
-                       (Side.Column_First, Part.Column_First);
-                     Side.Column_Last := GX_Integer'Max
-                       (Side.Column_Last, Part.Column_Last);
+                     Side.Column_First :=
+                       GX_Integer'Min (@, Part.Column_First);
+                     Side.Column_Last  :=
+                       GX_Integer'Max (@, Part.Column_Last);
                   end if;
 
                   Side.Last_Segment := Index;
@@ -814,15 +834,9 @@ package body GFX.Rasteriser.DDA4 is
                      Cursor.Y := Row_Upper;
 
                      if Row_Upper + One < Last.Y then
-                        --  Continue this segment by one DDA step. Clamp
-                        --  the displacement before adding to avoid overflow.
-                        declare
-                           DX : constant Fixed_16 := Last.X - Cursor.X;
-                        begin
-                           Cursor.At_Row_Upper := Cursor.X
-                             + Max (Min (Zero, DX),
-                                 Min (Max (Zero, DX), Chain (Index).Step_X));
-                        end;
+                        --  Continue this segment by one DDA step.
+                        --  Truncation toward zero keeps X within the segment.
+                        Cursor.At_Row_Upper := Cursor.X + Chain (Index).Step_X;
                      else
                         Cursor.At_Row_Upper := Zero;
                      end if;
@@ -862,6 +876,7 @@ package body GFX.Rasteriser.DDA4 is
 
    begin
       First_Coverage := (Zero, Zero);
+
       Collect (Left, Left_Cursor, True, Left_Side);
       Collect (Right, Right_Cursor, False, Right_Side);
       pragma Assert
@@ -1024,8 +1039,8 @@ package body GFX.Rasteriser.DDA4 is
             --  A newly activated portion starts inside this cell. Its first
             --  right-boundary intersection is initialized from the vertex;
             --  later intersections use Step_Column exclusively.
-            if X_Min <= Column_Upper and then Column_Upper <= X_Max
-              and then X_Min < X_Max
+            if X_Min <= Column_Upper and Column_Upper <= X_Max
+              and X_Min /= X_Max
             then
                Part.At_Column_Upper :=
                  Intersection_Y (Chain, Part, Column_Upper);
@@ -1707,6 +1722,26 @@ package body GFX.Rasteriser.DDA4 is
          --  Left_Last, Right_Last,
          Fill_Span);
    end Rasterize_Line;
+
+   ----------------------
+   -- Set_Column_Range --
+   ----------------------
+
+   procedure Set_Column_Range (Part : in out Segment_DDA) is
+      X_Min : constant Fixed_16 := Min (Part.X_Top, Part.X_Bottom);
+      X_Max : constant Fixed_16 := Max (Part.X_Top, Part.X_Bottom);
+
+   begin
+      Part.Column_First := To_Pixel (X_Min);
+      Part.Column_Last  := To_Pixel (X_Max);
+
+      if X_Min /= X_Max and Is_Upper_Bound (X_Max) then
+         --  The portion spans a nonzero X range and ends on a column
+         --  boundary. Exclude the column to its right, which it only touches.
+
+         Part.Column_Last := @ - 1;
+      end if;
+   end Set_Column_Range;
 
    ------------------------
    -- Set_Rendering_Area --
