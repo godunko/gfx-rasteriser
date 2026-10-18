@@ -63,9 +63,6 @@ package body GFX.Rasteriser.DDA4 is
       --  row. Each may be an original segment endpoint or an intersection
       --  with a row boundary.
 
-      At_Column_Lower : Fixed_16 := Zero;
-      At_Column_Upper : Fixed_16 := Zero;
-      --  Valid only if the corresponding boundary intersects this portion.
       Column_First    : GX_Integer := 0;
       Column_Last     : GX_Integer := -1;
    end record;
@@ -136,101 +133,55 @@ package body GFX.Rasteriser.DDA4 is
    --  equal, keep the single column containing the vertical portion; on a
    --  boundary, this is the column to its right.
 
-   type Interior_DDA is record
-      At_Column_Upper : Fixed_16 := Zero;
-      Floor_Upper     : Fixed_6  := Zero;
-      --  Last right-boundary intersection and its value floored to the
-      --  subpixel grid.
-      Step            : Fixed_16 := Zero;
-      Y_Top           : Fixed_16 := Zero;
-      Y_Bottom        : Fixed_16 := Zero;
-      Negate          : Boolean  := False;
-      --  Sign of the contribution, see Load.
+   type Portion_State is record
+      Column_First : GX_Integer := 0;
+      Column_Last  : GX_Integer := -1;
+      --  Inclusive range of cells crossed by the portion.
+      X_In         : Fixed_16 := Zero;
+      Y_In         : Fixed_16 := Zero;
+      --  Point where the portion enters the current cell: its left endpoint
+      --  in the first cell, then the intersection with the cell's left
+      --  boundary.
+      X_End        : Fixed_16 := Zero;
+      Y_End        : Fixed_16 := Zero;
+      --  Right endpoint of the portion.
+      Y_First_Out  : Fixed_16 := Zero;
+      --  Intersection with the right boundary of the first cell; valid only
+      --  when the portion spans several cells.
+      Step         : Fixed_16 := Zero;
+      Y_Lower      : Fixed_16 := Zero;
+      Y_Upper      : Fixed_16 := Zero;
+      --  DDA step and bounds of the portion along the Y axis.
+      Positive     : Boolean  := False;
+      --  Whether the contour traverses the portion from left to right.
    end record;
-   --  State of a portion while it crosses interior cells only. It contains
-   --  just the values used by the pixel loop, so they can be kept in
-   --  registers.
+   --  All state of the portion used while walking along the row. Objects of
+   --  this type are local, so the compiler can allocate them to registers.
 
-   procedure Load
+   type Portion_Array is array (Positive range <>) of Portion_State;
+
+   procedure Initialize_Portion
      (Chain    : Vertex_Array;
       Part     : Segment_DDA;
       Reversed : Boolean;
-      State    : out Interior_DDA)
+      State    : out Portion_State)
      with Inline_Always;
-   --  Initialize State from Part. Reversed traverses the segment against
-   --  chain order.
+   --  Initialize State to walk Part from its first cell. Reversed traverses
+   --  the segment against chain order.
 
-   procedure Advance (State : in out Interior_DDA; Height : in out Fixed_6)
-     with Inline_Always;
-   --  Advance column intersections by one pixel and add the signed height of
-   --  the portion inside the new cell to Height. Both boundaries of the new
-   --  cell must intersect the same segment, with no endpoint or activation
-   --  event in this cell.
-
-   procedure Store (State : Interior_DDA; Part : in out Segment_DDA)
-     with Inline_Always;
-   --  Save the right-boundary intersection back to Part. At_Column_Lower is
-   --  not updated: every later use of Part first assigns it from
-   --  At_Column_Upper.
-
-   function Interior_Alpha
-     (Accumulator : Fixed_6; Height : Fixed_6) return Grayscale
-     with Inline_Always;
-   --  Equivalent to Integrate for a cell whose boundaries are crossed by
-   --  portions only; the twice-area of such a cell is Height * One.
+   procedure Contribute
+     (State        : in out Portion_State;
+      Column       : GX_Integer;
+      Column_Upper : Fixed_16;
+      Coverage     : in out Cell_Coverage)
+     with Inline_Always,
+          Pre => Column in State.Column_First .. State.Column_Last;
+   --  Add the contribution of the portion to the cell Column and advance
+   --  State to the next cell. Cells must be visited in order.
 
    --  Initialize once before the first row.
 
    Rendering_Area : GFX.Implementation.Clipping.GF_Clipping_Rectangle;
-
-   type Segment_Set is mod 2 ** 3;
-   --  One bit per possible segment of a clipped rectangle side. This stores
-   --  pending indices only, not intersections or an event queue.
-
-   type Row_Side is record
-      Top_Segment    : Segment_DDA;
-      Bottom_Segment : Segment_DDA;
-      --  Portions extending across the last processed cell's right boundary,
-      --  in chain order. Only Top_Segment is used for a single crossing.
-      --  A zero Segment marks an inactive slot; its other fields are ignored.
-      First_Segment  : Natural := 0;
-      Last_Segment   : Natural := 0;
-      First_X        : Fixed_16 := Zero;
-      First_Y        : Fixed_16 := Zero;
-      Last_X         : Fixed_16 := Zero;
-      Last_Y         : Fixed_16 := Zero;
-      --  Full range and clipped endpoints for this row, including portions
-      --  lying entirely to the right of the first cell.
-      --  If two left portions cross the first cell's right boundary, only
-      --  the right side can have additional, entirely deferred portions.
-      Column_First   : GX_Integer := 0;
-      Column_Last    : GX_Integer := -1;
-      Pending        : Segment_Set := 0;
-      Next_Segment   : Natural := 0;
-      Next_Column    : GX_Integer := GX_Integer'Last;
-      Change_Column  : GX_Integer := GX_Integer'Last;
-      --  Nearest pending activation or active segment's final cell.
-   end record;
-
-   procedure Prepare_Row
-     (Left           : Vertex_Array;
-      Right          : Vertex_Array;
-      Row_Lower      : Fixed_16;
-      Row_Upper      : Fixed_16;
-      Left_Cursor    : in out Row_Cursor;
-      Right_Cursor   : in out Row_Cursor;
-      Left_Side      : out Row_Side;
-      Right_Side     : out Row_Side;
-      First_Column   : out GX_Integer;
-      First_Coverage : out Cell_Coverage)
-     with Pre => Row_Upper = Row_Lower + One
-       and Left_Cursor.Segment /= 0
-       and Right_Cursor.Segment /= 0
-       and Ghost.Only_First_Segment_Can_Move_Left (Left);
-   --  Consume only portions belonging to this row. Initialize and accumulate
-   --  First_Coverage for First_Column = Left_Side.Column_First, without
-   --  integrating or emitting it. Return column states for the current row
-   --  and advance both cursors to the next row (or mark them exhausted).
 
    function Can_Prepare_Simple_Row
      (Chain       : Vertex_Array;
@@ -249,116 +200,29 @@ package body GFX.Rasteriser.DDA4 is
      with Pre => Row_Upper = Row_Lower + One
        and Can_Prepare_Simple_Row (Chain, Cursor, Row_Lower, Row_Upper);
    --  Prepare the sole portion of this side crossing a complete row and
-   --  advance Cursor to the next row. No Row_Side or pending set is needed.
+   --  advance Cursor to the next row.
 
-   function Belongs_To_Same_Pixel (A : Fixed_16; B : Fixed_16) return Boolean;
-   --  Return True if there is an integer N such that both A and B lie in
-   --  the closed interval [N, N + 1] along one axis. Either coordinate may
-   --  lie on the pixel's upper boundary, regardless of argument order.
+   procedure Collect_Portions
+     (Chain     : Vertex_Array;
+      Row_Lower : Fixed_16;
+      Row_Upper : Fixed_16;
+      Reversed  : Boolean;
+      Cursor    : in out Row_Cursor;
+      Portions  : in out Portion_Array;
+      Count     : in out Natural)
+     with Pre => Row_Upper = Row_Lower + One and Cursor.Segment /= 0;
+   --  Append all portions of the chain belonging to this row to Portions,
+   --  in chain order, and advance Cursor to the next row (or mark it
+   --  exhausted).
 
    function Is_Upper_Bound (A : Fixed_16) return Boolean;
    --  Check whether A lies on an exclusive upper pixel boundary.
    --  Every integral coordinate is the upper boundary of the previous pixel.
 
-   procedure Accumulate
-     (Self         : in out Cell_Coverage;
-      Column_Upper : Fixed_16;
-      X_1          : Fixed_16;
-      Y_1          : Fixed_16;
-      X_2          : Fixed_16;
-      Y_2          : Fixed_16)
-     with Pre =>
-       Is_Upper_Bound (Column_Upper)
-         and Column_Upper - One <= X_1 and X_1 <= Column_Upper
-         and Column_Upper - One <= X_2 and X_2 <= Column_Upper
-         and Belongs_To_Same_Pixel (Y_1, Y_2),
-       Post =>
-         (if Y_1 = Y_2 then
-            Self.Coverage = Self.Coverage'Old
-              and then Self.Twice_Area = Self.Twice_Area'Old)
-            and then
-              (if X_1 = Column_Upper and then X_2 = Column_Upper then
-                 Self.Twice_Area = Self.Twice_Area'Old);
-   --  Accumulate the contribution of a directed segment contained in one
-   --  cell.
-
    procedure Integrate
      (Accumulator : in out Fixed_6;
       Coverage    : Cell_Coverage;
       Alpha       : out Grayscale) with Export;
-
-   procedure Step_Column (Part : in out Segment_DDA; Step : Fixed_16);
-
-   ----------------
-   -- Accumulate --
-   ----------------
-
-   procedure Accumulate
-     (Self         : in out Cell_Coverage;
-      Column_Upper : Fixed_16;
-      X_1          : Fixed_16;
-      Y_1          : Fixed_16;
-      X_2          : Fixed_16;
-      Y_2          : Fixed_16)
-   is
-      Delta_Y : constant Fixed_6  := Floor (Y_2) - Floor (Y_1);
-
-   begin
-      Self.Coverage   := @ + Delta_Y;
-      Self.Twice_Area :=
-        @ + Delta_Y * Floor ((Column_Upper - X_1) + (Column_Upper - X_2));
-   end Accumulate;
-
-   -------------
-   -- Advance --
-   -------------
-
-   procedure Advance (State : in out Interior_DDA; Height : in out Fixed_6)
-   is
-      Lower       : constant Fixed_16 := State.At_Column_Upper;
-      Floor_Lower : constant Fixed_6  := State.Floor_Upper;
-      Delta_Y     : Fixed_6;
-
-   begin
-      State.At_Column_Upper := Lower
-        + Max (State.Y_Top - Lower, Min (State.Y_Bottom - Lower, State.Step));
-      State.Floor_Upper := Floor (State.At_Column_Upper);
-      Delta_Y := State.Floor_Upper - Floor_Lower;
-
-      Height := (if State.Negate then @ - Delta_Y else @ + Delta_Y);
-   end Advance;
-
-   ---------------------------
-   -- Belongs_To_Same_Pixel --
-   ---------------------------
-
-   function Belongs_To_Same_Pixel
-     (A : Fixed_16; B : Fixed_16) return Boolean
-   is
-      Pixel_A : constant GX_Integer := To_Pixel (A);
-      Pixel_B : constant GX_Integer := To_Pixel (B);
-
-   begin
-      if Pixel_A = Pixel_B then
-         --  Both coordinates lie in the same half-open pixel interval.
-
-         return True;
-
-      elsif Pixel_B = Pixel_A + 1 then
-         --  B must be exactly on the upper boundary of A's pixel.
-
-         return B = To_Fixed_16 (Pixel_B);
-
-      elsif Pixel_A = Pixel_B + 1 then
-         --  A must be exactly on the upper boundary of B's pixel.
-
-         return A = To_Fixed_16 (Pixel_A);
-      end if;
-
-      --  Non-adjacent pixels cannot share a closed pixel interval.
-
-      return False;
-   end Belongs_To_Same_Pixel;
 
    ---------------
    -- Integrate --
@@ -378,20 +242,6 @@ package body GFX.Rasteriser.DDA4 is
    end Integrate;
 
    --------------------
-   -- Interior_Alpha --
-   --------------------
-
-   function Interior_Alpha
-     (Accumulator : Fixed_6; Height : Fixed_6) return Grayscale
-   is
-      Twice_Area : constant Fixed_12 := (2 * Accumulator + Height) * One;
-      --  Always even, so halving it is exact.
-
-   begin
-      return Grayscale (Integral (255 * abs Twice_Area / 2));
-   end Interior_Alpha;
-
-   --------------------
    -- Is_Upper_Bound --
    --------------------
 
@@ -406,67 +256,6 @@ package body GFX.Rasteriser.DDA4 is
 
       return A = To_Fixed_16 (To_Pixel (A));
    end Is_Upper_Bound;
-
-   ----------
-   -- Load --
-   ----------
-
-   procedure Load
-     (Chain    : Vertex_Array;
-      Part     : Segment_DDA;
-      Reversed : Boolean;
-      State    : out Interior_DDA) is
-   begin
-      State :=
-        (At_Column_Upper => Part.At_Column_Upper,
-         Floor_Upper     => Floor (Part.At_Column_Upper),
-         Step            => Chain (Part.Segment).Step_Y,
-         Y_Top           => Part.Y_Top,
-         Y_Bottom        => Part.Y_Bottom,
-         --  The difference follows increasing X. Reverse its sign when the
-         --  contour traverses this portion from right to left.
-         Negate          => not ((Part.X_Top < Part.X_Bottom) xor Reversed));
-   end Load;
-
-   -----------
-   -- Store --
-   -----------
-
-   procedure Store (State : Interior_DDA; Part : in out Segment_DDA) is
-   begin
-      Part.At_Column_Upper := State.At_Column_Upper;
-   end Store;
-
-   --------------------
-   -- Column_Portion --
-   --------------------
-
-   function Column_Portion
-     (Chain : Vertex_Array;
-      Side  : Row_Side;
-      Index : Positive) return Segment_DDA
-   is
-      Part : Segment_DDA;
-   begin
-      Part.Segment := Index;
-      Part.X_Top := Chain (Index).X;
-      Part.Y_Top := Chain (Index).Y;
-      Part.X_Bottom := Chain (Index + 1).X;
-      Part.Y_Bottom := Chain (Index + 1).Y;
-
-      if Index = Side.First_Segment then
-         Part.X_Top := Side.First_X;
-         Part.Y_Top := Side.First_Y;
-      end if;
-
-      if Index = Side.Last_Segment then
-         Part.X_Bottom := Side.Last_X;
-         Part.Y_Bottom := Side.Last_Y;
-      end if;
-
-      Set_Column_Range (Part);
-      return Part;
-   end Column_Portion;
 
    --------------------
    -- Intersection_Y --
@@ -494,50 +283,100 @@ package body GFX.Rasteriser.DDA4 is
 
    pragma Inline (Intersection_Y);
 
-   -------------------
-   -- Update_Change --
-   -------------------
+   ------------------------
+   -- Initialize_Portion --
+   ------------------------
 
-   procedure Update_Change (Side : in out Row_Side) is
+   procedure Initialize_Portion
+     (Chain    : Vertex_Array;
+      Part     : Segment_DDA;
+      Reversed : Boolean;
+      State    : out Portion_State)
+   is
+      Left_Is_Top : constant Boolean := Part.X_Top <= Part.X_Bottom;
+      --  For a vertical portion the top endpoint is used as the left one,
+      --  so the sign still follows the traversal direction.
+
    begin
-      Side.Change_Column := Side.Next_Column;
+      State.Column_First := Part.Column_First;
+      State.Column_Last  := Part.Column_Last;
+      State.Step         := Chain (Part.Segment).Step_Y;
+      State.Y_Lower      := Part.Y_Top;
+      State.Y_Upper      := Part.Y_Bottom;
+      State.Positive     := Left_Is_Top xor Reversed;
+      State.Y_First_Out  := Zero;
 
-      if Side.Top_Segment.Segment /= 0 then
-         Side.Change_Column := GX_Integer'Min
-           (Side.Change_Column, Side.Top_Segment.Column_Last);
+      if Left_Is_Top then
+         State.X_In  := Part.X_Top;
+         State.Y_In  := Part.Y_Top;
+         State.X_End := Part.X_Bottom;
+         State.Y_End := Part.Y_Bottom;
+
+      else
+         State.X_In  := Part.X_Bottom;
+         State.Y_In  := Part.Y_Bottom;
+         State.X_End := Part.X_Top;
+         State.Y_End := Part.Y_Top;
       end if;
 
-      if Side.Bottom_Segment.Segment /= 0 then
-         Side.Change_Column := GX_Integer'Min
-           (Side.Change_Column, Side.Bottom_Segment.Column_Last);
+      if Part.Column_First < Part.Column_Last then
+         --  Initialize the intersection from the original vertex. Later
+         --  cells use DDA steps.
+
+         State.Y_First_Out :=
+           Intersection_Y
+             (Chain, Part, Pixel_Lower_Bound (Part.Column_First) + One);
       end if;
-   end Update_Change;
+   end Initialize_Portion;
 
-   ------------------
-   -- Find_Pending --
-   ------------------
+   ----------------
+   -- Contribute --
+   ----------------
 
-   procedure Find_Pending (Chain : Vertex_Array; Side : in out Row_Side) is
+   procedure Contribute
+     (State        : in out Portion_State;
+      Column       : GX_Integer;
+      Column_Upper : Fixed_16;
+      Coverage     : in out Cell_Coverage)
+   is
+      X_Out   : Fixed_16;
+      Y_Out   : Fixed_16;
+      Delta_Y : Fixed_6;
+
    begin
-      Side.Next_Segment := 0;
-      Side.Next_Column := GX_Integer'Last;
+      if Column = State.Column_Last then
+         X_Out := State.X_End;
+         Y_Out := State.Y_End;
 
-      --  Called only after activation, never from the interior pixel loop.
-      --  Only pending segments of this row have their geometry inspected.
-      for Index in Side.First_Segment .. Side.Last_Segment loop
-         if (Side.Pending and 2 ** (Index - Chain'First)) /= 0 then
-            declare
-               Part : constant Segment_DDA :=
-                 Column_Portion (Chain, Side, Index);
-            begin
-               if Part.Column_First < Side.Next_Column then
-                  Side.Next_Segment := Index;
-                  Side.Next_Column := Part.Column_First;
-               end if;
-            end;
-         end if;
-      end loop;
-   end Find_Pending;
+      elsif Column = State.Column_First then
+         X_Out := Column_Upper;
+         Y_Out := State.Y_First_Out;
+
+      else
+         X_Out := Column_Upper;
+         Y_Out := State.Y_In
+           + Max (State.Y_Lower - State.Y_In,
+                  Min (State.Y_Upper - State.Y_In, State.Step));
+      end if;
+
+      --  Accumulate the height and twice the signed area of the trapezoid
+      --  matching the right edge for the part of the portion inside the
+      --  cell, directed along the contour.
+
+      Delta_Y := Floor (Y_Out) - Floor (State.Y_In);
+
+      if not State.Positive then
+         Delta_Y := Zero - Delta_Y;
+      end if;
+
+      Coverage.Coverage   := @ + Delta_Y;
+      Coverage.Twice_Area :=
+        @ + Delta_Y
+              * Floor ((Column_Upper - State.X_In) + (Column_Upper - X_Out));
+
+      State.X_In := X_Out;
+      State.Y_In := Y_Out;
+   end Contribute;
 
    ---------------------------
    -- Initialize_Row_Cursor --
@@ -602,8 +441,6 @@ package body GFX.Rasteriser.DDA4 is
          Y_Top           => Row_Lower,
          X_Bottom        => Cursor.At_Row_Upper,
          Y_Bottom        => Row_Upper,
-         At_Column_Lower => Zero,
-         At_Column_Upper => Zero,
          Column_First    => 0,
          Column_Last     => -1);
       Set_Column_Range (Part);
@@ -616,428 +453,132 @@ package body GFX.Rasteriser.DDA4 is
          else Zero);
    end Prepare_Simple_Portion;
 
-   -----------------
-   -- Prepare_Row --
-   -----------------
+   ----------------------
+   -- Collect_Portions --
+   ----------------------
 
-   procedure Prepare_Row
-     (Left           : Vertex_Array;
-      Right          : Vertex_Array;
-      Row_Lower      : Fixed_16;
-      Row_Upper      : Fixed_16;
-      Left_Cursor    : in out Row_Cursor;
-      Right_Cursor   : in out Row_Cursor;
-      Left_Side      : out Row_Side;
-      Right_Side     : out Row_Side;
-      First_Column   : out GX_Integer;
-      First_Coverage : out Cell_Coverage)
+   procedure Collect_Portions
+     (Chain     : Vertex_Array;
+      Row_Lower : Fixed_16;
+      Row_Upper : Fixed_16;
+      Reversed  : Boolean;
+      Cursor    : in out Row_Cursor;
+      Portions  : in out Portion_Array;
+      Count     : in out Natural)
    is
-      Column_Lower : Fixed_16;
-      Column_Upper : Fixed_16;
+      procedure Prepare_Intersection (Upper_Bound : Fixed_16)
+        with Pre =>
+          Cursor.Segment in Chain'First .. Chain'Last - 1
+          --  Both endpoints of the current segment exist.
+          and then Cursor.X = Chain (Cursor.Segment).X
+          --  The X displacement is measured from the first vertex.
+          and then Cursor.Y = Chain (Cursor.Segment).Y
+          --  Step_X and the Y displacement use the same origin.
+          and then Is_Upper_Bound (Upper_Bound)
+          --  The intersection lies on an integral row boundary.
+          and then
+            Ghost.Belongs_To_Pixel_Upper_Bound (Cursor.Y, Upper_Bound)
+          --  The positive Y displacement is at most one pixel, as required
+          --  by Multiply_Scaled.
+          and then Upper_Bound < Chain (Cursor.Segment + 1).Y;
+          --  The boundary is inside the segment; its final vertex is
+          --  handled separately by the caller.
+      --  Set Cursor.At_Row_Upper to the X coordinate where the current
+      --  segment intersects the row boundary Upper_Bound. The cursor must be
+      --  at the segment's first vertex, strictly above Upper_Bound and at
+      --  most one pixel away; the segment must end below Upper_Bound.
+      --  Cursor.X, Cursor.Y and Cursor.Segment are left unchanged.
 
-      procedure Collect
-        (Chain    : Vertex_Array;
-         Cursor   : in out Row_Cursor;
-         Reversed : Boolean;
-         Side     : out Row_Side);
+      --------------------------
+      -- Prepare_Intersection --
+      --------------------------
 
-      -------------
-      -- Collect --
-      -------------
-
-      procedure Collect
-        (Chain    : Vertex_Array;
-         Cursor   : in out Row_Cursor;
-         Reversed : Boolean;
-         Side     : out Row_Side)
-      is
-         procedure Prepare_Intersection (Upper_Bound : Fixed_16)
-           with Pre =>
-             Cursor.Segment in Chain'First .. Chain'Last - 1
-             --  Both endpoints of the current segment exist.
-             and then Cursor.X = Chain (Cursor.Segment).X
-             --  The X displacement is measured from the first vertex.
-             and then Cursor.Y = Chain (Cursor.Segment).Y
-             --  Step_X and the Y displacement use the same origin.
-             and then Is_Upper_Bound (Upper_Bound)
-             --  The intersection lies on an integral row boundary.
-             and then
-               Ghost.Belongs_To_Pixel_Upper_Bound (Cursor.Y, Upper_Bound)
-             --  The positive Y displacement is at most one pixel, as
-             --  required by Multiply_Scaled.
-             and then Upper_Bound < Chain (Cursor.Segment + 1).Y;
-             --  The boundary is inside the segment; its final vertex is
-             --  handled separately by the caller.
-         --  Set Cursor.At_Row_Upper to the X coordinate where the current
-         --  segment intersects the row boundary Upper_Bound. The cursor must
-         --  be at the segment's first vertex, strictly above Upper_Bound and
-         --  at most one pixel away; the segment must end below Upper_Bound.
-         --  Cursor.X, Cursor.Y and Cursor.Segment are left unchanged.
-
-         --------------------------
-         -- Prepare_Intersection --
-         --------------------------
-
-         procedure Prepare_Intersection (Upper_Bound : Fixed_16) is
-         begin
-            --  The cursor is at the segment's first vertex, and Upper_Bound
-            --  is inside the segment, at most one pixel below that vertex.
-            --  Truncation toward zero keeps the displacement within the
-            --  segment without clamping.
-
-            Cursor.At_Row_Upper := Cursor.X
-              + Multiply_Scaled
-                  (Chain (Cursor.Segment).Step_X, Upper_Bound - Cursor.Y);
-         end Prepare_Intersection;
-
+      procedure Prepare_Intersection (Upper_Bound : Fixed_16) is
       begin
-         Side := (others => <>);
+         --  The cursor is at the segment's first vertex, and Upper_Bound is
+         --  inside the segment, at most one pixel below that vertex.
+         --  Truncation toward zero keeps the displacement within the segment
+         --  without clamping.
 
-         while Cursor.Segment /= 0 loop
-            declare
-               Index : constant Positive := Cursor.Segment;
-               Last  : Vertex renames Chain (Index + 1);
-               Part  : Segment_DDA;
+         Cursor.At_Row_Upper := Cursor.X
+           + Multiply_Scaled
+               (Chain (Cursor.Segment).Step_X, Upper_Bound - Cursor.Y);
+      end Prepare_Intersection;
 
-            begin
-               pragma Assert (Row_Lower <= Cursor.Y);
-               pragma Assert (Cursor.Y < Last.Y);
+   begin
+      while Cursor.Segment /= 0 loop
+         declare
+            Index : constant Positive := Cursor.Segment;
+            Last  : Vertex renames Chain (Index + 1);
+            Part  : Segment_DDA;
 
-               if Cursor.Y < Row_Upper then
-                  Part.Segment := Index;
-                  Part.X_Top   := Cursor.X;
-                  Part.Y_Top   := Cursor.Y;
+         begin
+            pragma Assert (Row_Lower <= Cursor.Y);
+            pragma Assert (Cursor.Y < Last.Y);
 
-                  if Row_Upper < Last.Y then
-                     Part.X_Bottom := Cursor.At_Row_Upper;
-                     Part.Y_Bottom := Row_Upper;
+            if Cursor.Y < Row_Upper then
+               Part.Segment := Index;
+               Part.X_Top   := Cursor.X;
+               Part.Y_Top   := Cursor.Y;
 
-                  else
-                     Part.X_Bottom := Last.X;
-                     Part.Y_Bottom := Last.Y;
-                  end if;
+               if Row_Upper < Last.Y then
+                  Part.X_Bottom := Cursor.At_Row_Upper;
+                  Part.Y_Bottom := Row_Upper;
 
-                  Set_Column_Range (Part);
-
-                  if Side.First_Segment = 0 then
-                     Side.First_Segment := Index;
-                     Side.First_X       := Part.X_Top;
-                     Side.First_Y       := Part.Y_Top;
-                     Side.Column_First  := Part.Column_First;
-                     Side.Column_Last   := Part.Column_Last;
-
-                     if Reversed then
-                        --  Only the first left portion can move left. Later
-                        --  portions are vertical or move right, so its range
-                        --  determines the first cell of this row.
-
-                        First_Column := Part.Column_First;
-                        Column_Lower := Pixel_Lower_Bound (First_Column);
-                        Column_Upper := Column_Lower + One;
-                     end if;
-
-                  else
-                     Side.Column_First :=
-                       GX_Integer'Min (@, Part.Column_First);
-                     Side.Column_Last  :=
-                       GX_Integer'Max (@, Part.Column_Last);
-                  end if;
-
-                  Side.Last_Segment := Index;
-                  Side.Last_X := Part.X_Bottom;
-                  Side.Last_Y := Part.Y_Bottom;
-
-                  pragma Assert (First_Column <= Part.Column_First);
-
-                  declare
-                     X_Top : Fixed_16 := Part.X_Top;
-                     Y_Top : Fixed_16 := Part.Y_Top;
-                     X_Bottom : Fixed_16 := Part.X_Bottom;
-                     Y_Bottom : Fixed_16 := Part.Y_Bottom;
-                     X_Min : constant Fixed_16 := Min (X_Top, X_Bottom);
-                     X_Max : constant Fixed_16 := Max (X_Top, X_Bottom);
-
-                  begin
-                     --  Keep indices for portions starting in later cells.
-                     if Part.Column_First > First_Column then
-                        Side.Pending := Side.Pending
-                          or 2 ** (Part.Segment - Chain'First);
-
-                        if Part.Column_First < Side.Next_Column then
-                           Side.Next_Column := Part.Column_First;
-                           Side.Next_Segment := Part.Segment;
-                        end if;
-
-                     else
-                        if X_Min <= Column_Lower
-                          and Column_Lower <= X_Max
-                        then
-                           Part.At_Column_Lower :=
-                             Intersection_Y (Chain, Part, Column_Lower);
-                        end if;
-
-                        if X_Min <= Column_Upper
-                          and Column_Upper <= X_Max
-                        then
-                           Part.At_Column_Upper :=
-                             Intersection_Y (Chain, Part, Column_Upper);
-                        end if;
-
-                        if X_Top > Column_Upper then
-                           X_Top := Column_Upper;
-                           Y_Top := Part.At_Column_Upper;
-                        elsif X_Top < Column_Lower then
-                           X_Top := Column_Lower;
-                           Y_Top := Part.At_Column_Lower;
-                        end if;
-
-                        if X_Bottom > Column_Upper then
-                           X_Bottom := Column_Upper;
-                           Y_Bottom := Part.At_Column_Upper;
-                        elsif X_Bottom < Column_Lower then
-                           X_Bottom := Column_Lower;
-                           Y_Bottom := Part.At_Column_Lower;
-                        end if;
-
-                        if Reversed then
-                           Accumulate (First_Coverage, Column_Upper,
-                             X_Bottom, Y_Bottom, X_Top, Y_Top);
-                        else
-                           Accumulate (First_Coverage, Column_Upper,
-                             X_Top, Y_Top, X_Bottom, Y_Bottom);
-                        end if;
-
-                        if First_Column < Part.Column_Last then
-                           if Side.Top_Segment.Segment = 0 then
-                              Side.Top_Segment := Part;
-                           else
-                              pragma Assert (Side.Bottom_Segment.Segment = 0);
-                              Side.Bottom_Segment := Part;
-                           end if;
-                        end if;
-                     end if;
-                  end;
-
-                  if Row_Upper < Last.Y then
-                     Cursor.X := Part.X_Bottom;
-                     Cursor.Y := Row_Upper;
-
-                     if Row_Upper + One < Last.Y then
-                        --  Continue this segment by one DDA step.
-                        --  Truncation toward zero keeps X within the segment.
-                        Cursor.At_Row_Upper := Cursor.X + Chain (Index).Step_X;
-                     else
-                        Cursor.At_Row_Upper := Zero;
-                     end if;
-
-                     return;
-                  end if;
+               else
+                  Part.X_Bottom := Last.X;
+                  Part.Y_Bottom := Last.Y;
                end if;
 
-               if Row_Upper <= Cursor.Y then
-                  --  A newly selected segment starts in the next row.
+               Set_Column_Range (Part);
+
+               Count := Count + 1;
+               Initialize_Portion (Chain, Part, Reversed, Portions (Count));
+
+               if Row_Upper < Last.Y then
+                  Cursor.X := Part.X_Bottom;
+                  Cursor.Y := Row_Upper;
+
                   if Row_Upper + One < Last.Y then
-                     Prepare_Intersection (Row_Upper + One);
+                     --  Continue this segment by one DDA step. Truncation
+                     --  toward zero keeps X within the segment.
+                     Cursor.At_Row_Upper := Cursor.X + Chain (Index).Step_X;
                   else
                      Cursor.At_Row_Upper := Zero;
                   end if;
 
                   return;
                end if;
+            end if;
 
-               --  Consume a finished segment exactly once.
-               if Index + 1 = Chain'Last then
-                  Cursor := (others => <>);
+            if Row_Upper <= Cursor.Y then
+               --  A newly selected segment starts in the next row.
+               if Row_Upper + One < Last.Y then
+                  Prepare_Intersection (Row_Upper + One);
                else
-                  Cursor.Segment := Index + 1;
-                  Cursor.X := Last.X;
-                  Cursor.Y := Last.Y;
-
-                  if Cursor.Y < Row_Upper
-                    and then Row_Upper < Chain (Index + 2).Y
-                  then
-                     Prepare_Intersection (Row_Upper);
-                  end if;
+                  Cursor.At_Row_Upper := Zero;
                end if;
-            end;
-         end loop;
-      end Collect;
 
-   begin
-      First_Coverage := (Zero, Zero);
+               return;
+            end if;
 
-      Collect (Left, Left_Cursor, True, Left_Side);
-      Collect (Right, Right_Cursor, False, Right_Side);
-      pragma Assert
-        (Left_Side.First_Segment /= 0 and Right_Side.First_Segment /= 0);
-      pragma Assert (Left_Side.Column_First <= Right_Side.Column_First);
-
-      Update_Change (Left_Side);
-      Update_Change (Right_Side);
-   end Prepare_Row;
-
-   -----------------------
-   -- Accumulate_Portion --
-   -----------------------
-
-   procedure Accumulate_Portion
-     (Part         : Segment_DDA;
-      Column_Upper : Fixed_16;
-      Reversed     : Boolean;
-      Coverage     : in out Cell_Coverage)
-   is
-      Column_Lower : constant Fixed_16 := Column_Upper - One;
-      X_Top    : Fixed_16 := Part.X_Top;
-      Y_Top    : Fixed_16 := Part.Y_Top;
-      X_Bottom : Fixed_16 := Part.X_Bottom;
-      Y_Bottom : Fixed_16 := Part.Y_Bottom;
-   begin
-      if X_Top < Column_Lower then
-         X_Top := Column_Lower;
-         Y_Top := Part.At_Column_Lower;
-      elsif X_Top > Column_Upper then
-         X_Top := Column_Upper;
-         Y_Top := Part.At_Column_Upper;
-      end if;
-
-      if X_Bottom < Column_Lower then
-         X_Bottom := Column_Lower;
-         Y_Bottom := Part.At_Column_Lower;
-      elsif X_Bottom > Column_Upper then
-         X_Bottom := Column_Upper;
-         Y_Bottom := Part.At_Column_Upper;
-      end if;
-
-      if Reversed then
-         Accumulate (Coverage, Column_Upper,
-           X_Bottom, Y_Bottom, X_Top, Y_Top);
-      else
-         Accumulate (Coverage, Column_Upper,
-           X_Top, Y_Top, X_Bottom, Y_Bottom);
-      end if;
-   end Accumulate_Portion;
-
-   pragma Inline (Accumulate_Portion);
-
-   -----------------
-   -- Step_Column --
-   -----------------
-
-   procedure Step_Column (Part : in out Segment_DDA; Step : Fixed_16) is
-   begin
-      Part.At_Column_Lower := Part.At_Column_Upper;
-      Part.At_Column_Upper := Part.At_Column_Lower
-        + Max (Part.Y_Top - Part.At_Column_Lower,
-            Min (Part.Y_Bottom - Part.At_Column_Lower, Step));
-   end Step_Column;
-
-   -----------------------
-   -- Accumulate_Change --
-   -----------------------
-
-   procedure Accumulate_Change
-     (Chain        : Vertex_Array;
-      Side         : in out Row_Side;
-      Column       : GX_Integer;
-      Column_Upper : Fixed_16;
-      Reversed     : Boolean;
-      Coverage     : in out Cell_Coverage)
-   is
-      procedure Keep (Part : Segment_DDA);
-
-      procedure Continue_Portion (Part : in out Segment_DDA);
-
-      procedure Keep (Part : Segment_DDA) is
-      begin
-         if Column < Part.Column_Last then
-            if Side.Top_Segment.Segment = 0 then
-               Side.Top_Segment := Part;
+            --  Consume a finished segment exactly once.
+            if Index + 1 = Chain'Last then
+               Cursor := (others => <>);
             else
-               pragma Assert (Side.Bottom_Segment.Segment = 0);
+               Cursor.Segment := Index + 1;
+               Cursor.X := Last.X;
+               Cursor.Y := Last.Y;
 
-               if Part.Segment < Side.Top_Segment.Segment then
-                  Side.Bottom_Segment := Side.Top_Segment;
-                  Side.Top_Segment := Part;
-               else
-                  Side.Bottom_Segment := Part;
+               if Cursor.Y < Row_Upper
+                 and then Row_Upper < Chain (Index + 2).Y
+               then
+                  Prepare_Intersection (Row_Upper);
                end if;
             end if;
-         end if;
-      end Keep;
-
-      ----------------------
-      -- Continue_Portion --
-      ----------------------
-
-      procedure Continue_Portion (Part : in out Segment_DDA) is
-      begin
-         if Part.Segment = 0 then
-            return;
-         end if;
-
-         if Column_Upper < Max (Part.X_Top, Part.X_Bottom) then
-            Step_Column (Part, Chain (Part.Segment).Step_Y);
-
-         else
-            --  No intersection beyond the endpoint is needed in this cell.
-
-            Part.At_Column_Lower := Part.At_Column_Upper;
-         end if;
-
-         Accumulate_Portion (Part, Column_Upper, Reversed, Coverage);
-
-         if Column >= Part.Column_Last then
-            --  Geometry is no longer read after this portion is exhausted.
-
-            Part.Segment := 0;
-         end if;
-      end Continue_Portion;
-
-   begin
-      --  Advance active portions in place, preserving their chain order.
-      --  The common single-portion case needs no record copies or clearing.
-
-      Continue_Portion (Side.Top_Segment);
-      Continue_Portion (Side.Bottom_Segment);
-
-      if Side.Top_Segment.Segment = 0
-        and Side.Bottom_Segment.Segment /= 0
-      then
-         --  Keep a sole surviving portion in the top slot before activation
-         --  of pending portions, as required by Keep and Draw_Interior.
-
-         Side.Top_Segment := Side.Bottom_Segment;
-         Side.Bottom_Segment.Segment := 0;
-      end if;
-
-      while Side.Next_Segment /= 0 and then Side.Next_Column = Column loop
-         declare
-            Index : constant Positive := Side.Next_Segment;
-            Part  : Segment_DDA := Column_Portion (Chain, Side, Index);
-            X_Min : constant Fixed_16 := Min (Part.X_Top, Part.X_Bottom);
-            X_Max : constant Fixed_16 := Max (Part.X_Top, Part.X_Bottom);
-         begin
-            Side.Pending := Side.Pending
-              and not (2 ** (Index - Chain'First));
-
-            --  A newly activated portion starts inside this cell. Its first
-            --  right-boundary intersection is initialized from the vertex;
-            --  later intersections use Step_Column exclusively.
-            if X_Min <= Column_Upper and Column_Upper <= X_Max
-              and X_Min /= X_Max
-            then
-               Part.At_Column_Upper :=
-                 Intersection_Y (Chain, Part, Column_Upper);
-            end if;
-
-            Accumulate_Portion (Part, Column_Upper, Reversed, Coverage);
-            Keep (Part);
-            Find_Pending (Chain, Side);
          end;
       end loop;
-
-      Update_Change (Side);
-   end Accumulate_Change;
+   end Collect_Portions;
 
    -----------------------
    -- Rasterize_Contour --
@@ -1055,326 +596,180 @@ package body GFX.Rasteriser.DDA4 is
       use type Grayscale;
 
       Left_Cursor, Right_Cursor : Row_Cursor;
-      Left_Side, Right_Side     : Row_Side;
       Row          : GX_Integer := To_Pixel (Left (Left'First).Y);
       Row_Lower    : Fixed_16 := Pixel_Lower_Bound (Row);
       Row_Upper    : Fixed_16 := Row_Lower + One;
-      Column       : GX_Integer;
-      Column_Upper : Fixed_16;
-      Coverage     : Cell_Coverage;
       Accumulator  : Fixed_6;
-      Alpha        : Grayscale;
 
-      procedure Emit (Width : Device_Pixel_Count := 1)
+      procedure Fill_Solid
+        (Column : GX_Integer;
+         Width  : Device_Pixel_Count)
         with Inline_Always;
-
-      ----------
-      -- Emit --
-      ----------
-
-      procedure Emit (Width : Device_Pixel_Count := 1) is
-      begin
-         Integrate (Accumulator, Coverage, Alpha);
-
-         if Alpha /= 0 then
-            Fill_Span (Column, Row, Width, Alpha);
-         end if;
-      end Emit;
-
-      generic
-         Left_Count  : Natural;
-         Right_Count : Natural;
-         --  Number of active portions on each side, 0 .. 2.
-      procedure Draw_Run
-        (Last         : GX_Integer;
-         Left_Top     : in out Segment_DDA;
-         Left_Bottom  : in out Segment_DDA;
-         Right_Top    : in out Segment_DDA;
-         Right_Bottom : in out Segment_DDA);
-      --  Draw interior cells Column .. Last. Both boundaries of each cell
-      --  intersect every active portion, so each portion contributes exactly
-      --  one DDA step per cell. All loop state is kept in local variables to
-      --  let the compiler allocate it to registers; portions are loaded once
-      --  before and stored once after the loop.
-
-      procedure Draw_Run
-        (Last         : GX_Integer;
-         Left_Top     : in out Segment_DDA;
-         Left_Bottom  : in out Segment_DDA;
-         Right_Top    : in out Segment_DDA;
-         Right_Bottom : in out Segment_DDA)
-      is
-         pragma Warnings (Off, "*is not referenced*");
-         pragma Warnings (Off, "*not modified*");
-         --  Unused portions depend on the instantiation.
-
-         Left_1  : Interior_DDA;
-         Left_2  : Interior_DDA;
-         Right_1 : Interior_DDA;
-         Right_2 : Interior_DDA;
-
-         Current : GX_Integer := Column;
-         Acc     : Fixed_6    := Accumulator;
-         Y       : constant GX_Integer := Row;
-         Height  : Fixed_6;
-         Value   : Grayscale;
-
-      begin
-         if Left_Count >= 1 then
-            Load (Left, Left_Top, True, Left_1);
-         end if;
-
-         if Left_Count >= 2 then
-            Load (Left, Left_Bottom, True, Left_2);
-         end if;
-
-         if Right_Count >= 1 then
-            Load (Right, Right_Top, False, Right_1);
-         end if;
-
-         if Right_Count >= 2 then
-            Load (Right, Right_Bottom, False, Right_2);
-         end if;
-
-         while Current <= Last loop
-            Height := Zero;
-
-            if Left_Count >= 1 then
-               Advance (Left_1, Height);
-            end if;
-
-            if Left_Count >= 2 then
-               Advance (Left_2, Height);
-            end if;
-
-            if Right_Count >= 1 then
-               Advance (Right_1, Height);
-            end if;
-
-            if Right_Count >= 2 then
-               Advance (Right_2, Height);
-            end if;
-
-            Value := Interior_Alpha (Acc, Height);
-            Acc   := @ + Height;
-
-            if Value /= 0 then
-               Fill_Span (Current, Y, 1, Value);
-            end if;
-
-            Current := @ + 1;
-         end loop;
-
-         Column       := Current;
-         Column_Upper := Pixel_Lower_Bound (Column) + One;
-         Accumulator  := Acc;
-
-         if Left_Count >= 1 then
-            Store (Left_1, Left_Top);
-         end if;
-
-         if Left_Count >= 2 then
-            Store (Left_2, Left_Bottom);
-         end if;
-
-         if Right_Count >= 1 then
-            Store (Right_1, Right_Top);
-         end if;
-
-         if Right_Count >= 2 then
-            Store (Right_2, Right_Bottom);
-         end if;
-      end Draw_Run;
-
-      --  Choose a specialized loop once per range. No membership or active
-      --  segment count checks occur inside these pixel loops.
-      procedure Draw_01 is new Draw_Run (0, 1);
-      procedure Draw_02 is new Draw_Run (0, 2);
-      procedure Draw_10 is new Draw_Run (1, 0);
-      procedure Draw_11 is new Draw_Run (1, 1);
-      procedure Draw_12 is new Draw_Run (1, 2);
-      procedure Draw_20 is new Draw_Run (2, 0);
-      procedure Draw_21 is new Draw_Run (2, 1);
-      procedure Draw_22 is new Draw_Run (2, 2);
-
-      procedure Draw_Interior (Last : GX_Integer) is
-      begin
-         if Left_Side.Top_Segment.Segment = 0 then
-            if Right_Side.Top_Segment.Segment = 0 then
-               --  No boundary crosses this range. Its occupied row height
-               --  is already represented by Accumulator, including partial
-               --  first and last rows.
-               Coverage := (Zero, Zero);
-               Emit (Device_Pixel_Count (Last - Column + 1));
-               Column := Last + 1;
-               Column_Upper := Pixel_Lower_Bound (Column) + One;
-            elsif Right_Side.Bottom_Segment.Segment = 0 then
-               Draw_01 (Last,
-                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
-                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
-            else
-               Draw_02 (Last,
-                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
-                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
-            end if;
-
-         elsif Left_Side.Bottom_Segment.Segment = 0 then
-            if Right_Side.Top_Segment.Segment = 0 then
-               Draw_10 (Last,
-                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
-                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
-            elsif Right_Side.Bottom_Segment.Segment = 0 then
-               Draw_11 (Last,
-                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
-                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
-            else
-               Draw_12 (Last,
-                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
-                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
-            end if;
-
-         else
-            if Right_Side.Top_Segment.Segment = 0 then
-               Draw_20 (Last,
-                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
-                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
-            elsif Right_Side.Bottom_Segment.Segment = 0 then
-               Draw_21 (Last,
-                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
-                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
-            else
-               Draw_22 (Last,
-                 Left_Side.Top_Segment, Left_Side.Bottom_Segment,
-                 Right_Side.Top_Segment, Right_Side.Bottom_Segment);
-            end if;
-         end if;
-      end Draw_Interior;
+      --  Fill cells not crossed by any boundary. Their occupied row height
+      --  is represented by Accumulator, including partial first and last
+      --  rows.
 
       procedure Draw_Simple_Row;
-      --  Draw a complete row crossed by one segment per side. Only the
-      --  first and last columns of each portion need endpoint handling;
-      --  ranges between them use specialized loops without Row_Side events.
+      --  Draw a complete row crossed by one segment per side.
+
+      procedure Draw_General_Row;
+      --  Draw a row crossed by any number of portions on each side.
+
+      ----------------
+      -- Fill_Solid --
+      ----------------
+
+      procedure Fill_Solid
+        (Column : GX_Integer;
+         Width  : Device_Pixel_Count)
+      is
+         Acc   : Fixed_6 := Accumulator;
+         Value : Grayscale;
+
+      begin
+         Integrate (Acc, (Zero, Zero), Value);
+
+         if Value /= 0 then
+            Fill_Span (Column, Row, Width, Value);
+         end if;
+      end Fill_Solid;
+
+      ---------------------
+      -- Draw_Simple_Row --
+      ---------------------
 
       procedure Draw_Simple_Row is
-         Left_Part, Right_Part : Segment_DDA;
-         Left_Unused, Right_Unused : Segment_DDA;
-
-         procedure Add_Endpoint
-           (Chain    : Vertex_Array;
-            Part     : in out Segment_DDA;
-            Reversed : Boolean);
-         function Next_Endpoint (Part : Segment_DDA) return GX_Integer;
-
-         procedure Draw_Left is new Draw_Run (1, 0);
-         procedure Draw_Both is new Draw_Run (1, 1);
-         procedure Draw_Right is new Draw_Run (0, 1);
-
-         procedure Add_Endpoint
-           (Chain    : Vertex_Array;
-            Part     : in out Segment_DDA;
-            Reversed : Boolean)
-         is
-            X_Max : constant Fixed_16 := Max (Part.X_Top, Part.X_Bottom);
-
-         begin
-            if Column not in Part.Column_First .. Part.Column_Last then
-               return;
-            end if;
-
-            if Part.Column_First = Part.Column_Last then
-               --  The whole portion lies inside this cell, so no column
-               --  boundary intersection is needed.
-
-               if Reversed then
-                  Accumulate (Coverage, Column_Upper,
-                    Part.X_Bottom, Part.Y_Bottom, Part.X_Top, Part.Y_Top);
-               else
-                  Accumulate (Coverage, Column_Upper,
-                    Part.X_Top, Part.Y_Top, Part.X_Bottom, Part.Y_Bottom);
-               end if;
-
-               return;
-            end if;
-
-            if Column = Part.Column_First then
-               --  Initialize the intersection from the original vertex, as
-               --  in the general path. Later columns retain the same DDA
-               --  steps. The portion continues to the next cell, so it
-               --  crosses Column_Upper; X_Min is not less than Column_Lower,
-               --  thus At_Column_Lower is not used in this cell.
-
-               Part.At_Column_Upper :=
-                 Intersection_Y (Chain, Part, Column_Upper);
-
-            elsif Column_Upper < X_Max then
-               Step_Column (Part, Chain (Part.Segment).Step_Y);
-            else
-               Part.At_Column_Lower := Part.At_Column_Upper;
-            end if;
-
-            Accumulate_Portion (Part, Column_Upper, Reversed, Coverage);
-         end Add_Endpoint;
-
-         function Next_Endpoint (Part : Segment_DDA) return GX_Integer is
-         begin
-            if Column <= Part.Column_First then
-               return Part.Column_First;
-            elsif Column <= Part.Column_Last then
-               return Part.Column_Last;
-            else
-               return Right_Part.Column_Last + 1;
-            end if;
-         end Next_Endpoint;
+         Part        : Segment_DDA;
+         Left_State  : Portion_State;
+         Right_State : Portion_State;
+         Current     : GX_Integer;
+         Upper       : Fixed_16;
+         Cell        : Cell_Coverage;
+         Value       : Grayscale;
+         Y           : constant GX_Integer := Row;
 
       begin
          Prepare_Simple_Portion
-           (Left, Row_Lower, Row_Upper, Left_Cursor, Left_Part);
+           (Left, Row_Lower, Row_Upper, Left_Cursor, Part);
+         Initialize_Portion (Left, Part, True, Left_State);
          Prepare_Simple_Portion
-           (Right, Row_Lower, Row_Upper, Right_Cursor, Right_Part);
-         pragma Assert (Left_Part.Column_First <= Right_Part.Column_First);
+           (Right, Row_Lower, Row_Upper, Right_Cursor, Part);
+         Initialize_Portion (Right, Part, False, Right_State);
+         pragma Assert
+           (Left_State.Column_First <= Right_State.Column_First);
 
-         Column := Left_Part.Column_First;
-         Column_Upper := Pixel_Lower_Bound (Column) + One;
+         Current := Left_State.Column_First;
+         Upper   := Pixel_Lower_Bound (Current) + One;
 
-         while Column <= Right_Part.Column_Last loop
-            declare
-               Change : constant GX_Integer := GX_Integer'Min
-                 (Next_Endpoint (Left_Part), Next_Endpoint (Right_Part));
-            begin
-               pragma Assert (Column <= Change);
+         while Current <= Right_State.Column_Last loop
+            if Current > Left_State.Column_Last
+              and Current < Right_State.Column_First
+            then
+               Fill_Solid
+                 (Current,
+                  Device_Pixel_Count (Right_State.Column_First - Current));
+               Current := Right_State.Column_First;
+               Upper   := Pixel_Lower_Bound (Current) + One;
 
-               if Column = Change then
-                  Coverage := (Zero, Zero);
-                  Add_Endpoint (Left, Left_Part, True);
-                  Add_Endpoint (Right, Right_Part, False);
-                  Emit;
-                  Column := @ + 1;
-                  Column_Upper := @ + One;
+            else
+               Cell := (Zero, Zero);
 
-               elsif Column <= Left_Part.Column_Last then
-                  if Column >= Right_Part.Column_First then
-                     Draw_Both (Change - 1,
-                       Left_Part, Left_Unused, Right_Part, Right_Unused);
-                  else
-                     Draw_Left (Change - 1,
-                       Left_Part, Left_Unused, Right_Part, Right_Unused);
-                  end if;
-
-               elsif Column >= Right_Part.Column_First then
-                  Draw_Right (Change - 1,
-                    Left_Part, Left_Unused, Right_Part, Right_Unused);
-
-               else
-                  --  No boundary crosses this range. Preserve the general
-                  --  path's single span and accumulated coverage.
-                  Coverage := (Zero, Zero);
-                  Emit (Device_Pixel_Count (Change - Column));
-                  Column := Change;
-                  Column_Upper := Pixel_Lower_Bound (Column) + One;
+               if Current <= Left_State.Column_Last then
+                  Contribute (Left_State, Current, Upper, Cell);
                end if;
-            end;
+
+               if Current >= Right_State.Column_First then
+                  Contribute (Right_State, Current, Upper, Cell);
+               end if;
+
+               Integrate (Accumulator, Cell, Value);
+
+               if Value /= 0 then
+                  Fill_Span (Current, Y, 1, Value);
+               end if;
+
+               Current := @ + 1;
+               Upper   := @ + One;
+            end if;
          end loop;
       end Draw_Simple_Row;
+
+      ----------------------
+      -- Draw_General_Row --
+      ----------------------
+
+      procedure Draw_General_Row is
+         Portions : Portion_Array (1 .. Left'Length + Right'Length - 2);
+         Count    : Natural := 0;
+         Current  : GX_Integer;
+         Last     : GX_Integer := GX_Integer'First;
+         Upper    : Fixed_16;
+         Cell     : Cell_Coverage;
+         Value    : Grayscale;
+         Active   : Boolean;
+         Next     : GX_Integer;
+
+      begin
+         pragma Assert (Ghost.Only_First_Segment_Can_Move_Left (Left));
+
+         Collect_Portions
+           (Left, Row_Lower, Row_Upper, True, Left_Cursor, Portions, Count);
+         pragma Assert (Count /= 0);
+
+         --  Only the first left portion can move left. Later portions are
+         --  vertical or move right, so its range determines the first cell
+         --  of this row.
+
+         Current := Portions (1).Column_First;
+
+         declare
+            Right_First : constant Positive := Count + 1;
+
+         begin
+            Collect_Portions
+              (Right, Row_Lower, Row_Upper, False, Right_Cursor,
+               Portions, Count);
+            pragma Assert (Count >= Right_First);
+
+            for Index in Right_First .. Count loop
+               Last := GX_Integer'Max (@, Portions (Index).Column_Last);
+            end loop;
+         end;
+
+         Upper := Pixel_Lower_Bound (Current) + One;
+
+         while Current <= Last loop
+            Cell   := (Zero, Zero);
+            Active := False;
+            Next   := Last + 1;
+
+            for Portion of Portions (1 .. Count) loop
+               if Current in Portion.Column_First .. Portion.Column_Last then
+                  Contribute (Portion, Current, Upper, Cell);
+                  Active := True;
+
+               elsif Current < Portion.Column_First then
+                  Next := GX_Integer'Min (@, Portion.Column_First);
+               end if;
+            end loop;
+
+            if Active then
+               Integrate (Accumulator, Cell, Value);
+
+               if Value /= 0 then
+                  Fill_Span (Current, Row, 1, Value);
+               end if;
+
+               Current := @ + 1;
+               Upper   := @ + One;
+
+            else
+               Fill_Solid (Current, Device_Pixel_Count (Next - Current));
+               Current := Next;
+               Upper   := Pixel_Lower_Bound (Current) + One;
+            end if;
+         end loop;
+      end Draw_General_Row;
 
    begin
       Initialize_Row_Cursor (Left, Row_Upper, Left_Cursor);
@@ -1390,40 +785,7 @@ package body GFX.Rasteriser.DDA4 is
          then
             Draw_Simple_Row;
          else
-            Prepare_Row (Left, Right, Row_Lower, Row_Upper,
-              Left_Cursor, Right_Cursor, Left_Side, Right_Side,
-              Column, Coverage);
-
-            Column_Upper := Pixel_Lower_Bound (Column) + One;
-            Emit;
-
-            Column := @ + 1;
-            Column_Upper := @ + One;
-
-            while Column <= Right_Side.Column_Last loop
-               declare
-                  Change : constant GX_Integer := GX_Integer'Min
-                    (Right_Side.Column_Last + 1,
-                     GX_Integer'Min
-                       (Left_Side.Change_Column, Right_Side.Change_Column));
-               begin
-                  pragma Assert (Column <= Change);
-
-                  if Column < Change then
-                     Draw_Interior (Change - 1);
-
-                  else
-                     Coverage := (Zero, Zero);
-                     Accumulate_Change (Left, Left_Side, Column,
-                       Column_Upper, True, Coverage);
-                     Accumulate_Change (Right, Right_Side, Column,
-                       Column_Upper, False, Coverage);
-                     Emit;
-                     Column := @ + 1;
-                     Column_Upper := @ + One;
-                  end if;
-               end;
-            end loop;
+            Draw_General_Row;
          end if;
 
          pragma Assert
