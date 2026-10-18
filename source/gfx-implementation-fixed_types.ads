@@ -245,6 +245,7 @@ is
    pragma Inline (Multiply_Saturated);
    pragma Inline (Multiply_Scaled);
    pragma Inline (Pixel_Lower_Bound);
+   pragma Inline (Snap_To_Subpixel);
 
    package Ghost with Ghost is
 

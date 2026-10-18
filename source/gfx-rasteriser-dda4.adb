@@ -39,6 +39,10 @@ package body GFX.Rasteriser.DDA4 is
       --  Inverse slope of the segment to the next vertex, ΔX / ΔY: change
       --  of X when Y changes, used to compute intersections with row
       --  boundaries.
+      Column_Slope : Slope;
+      --  Slope of the segment to the next vertex, ΔY / ΔX, along increasing
+      --  X: change of Y when X increases, used to compute intersections with
+      --  column boundaries.
    end record;
 
    type Vertex_Array is array (Positive range <>) of Vertex;
@@ -52,10 +56,6 @@ package body GFX.Rasteriser.DDA4 is
       At_Row_Upper : Coordinate;
       --  Valid only when this segment extends below the current row.
       Has_Column   : Boolean := False;
-      Column_Slope : Slope;
-      --  Slope of the segment, ΔY / ΔX, along increasing X: change of Y when
-      --  X increases, used to compute intersections with column boundaries.
-      --  It is computed when the first intersection is needed.
       Column_Upper : Fixed_16 := Zero;
       At_Column    : Coordinate;
       --  Last computed intersection of this segment with a column boundary,
@@ -105,6 +105,10 @@ package body GFX.Rasteriser.DDA4 is
        --  Top and bottom segments between left and right edge lists are
        --  horizontal.
        and Left (Left'Last).Y > Left (Left'First).Y;
+
+   procedure Initialize_Slopes (Item : in out Vertex; Next : Vertex)
+     with Pre => Item.Y <= Next.Y;
+   --  Compute slopes of the segment from Item to Next.
 
    procedure Initialize_Row_Cursor
      (Chain     : Vertex_Array;
@@ -196,6 +200,8 @@ package body GFX.Rasteriser.DDA4 is
    --  Initialize once before the first row.
 
    Rendering_Area : GFX.Implementation.Clipping.GF_Clipping_Rectangle;
+   Rendering_Y_Max : Fixed_16;
+   --  Bottom boundary of the rendering area.
 
    function Can_Prepare_Simple_Row
      (Chain       : Vertex_Array;
@@ -270,6 +276,24 @@ package body GFX.Rasteriser.DDA4 is
       return A = To_Fixed_16 (To_Pixel (A));
    end Is_Upper_Bound;
 
+   -----------------------
+   -- Initialize_Slopes --
+   -----------------------
+
+   procedure Initialize_Slopes (Item : in out Vertex; Next : Vertex) is
+      DX : constant Fixed_16 := Next.X - Item.X;
+      DY : constant Fixed_16 := Next.Y - Item.Y;
+
+   begin
+      Initialize (Item.Row_Slope, DX, DY);
+
+      if DX >= Zero then
+         Initialize (Item.Column_Slope, DY, DX);
+      else
+         Initialize (Item.Column_Slope, -DY, -DX);
+      end if;
+   end Initialize_Slopes;
+
    ------------------------
    -- Initialize_Portion --
    ------------------------
@@ -317,20 +341,6 @@ package body GFX.Rasteriser.DDA4 is
 
          begin
             if not Cursor.Has_Column then
-               declare
-                  DX : constant Fixed_16 :=
-                    Chain (Segment + 1).X - Chain (Segment).X;
-                  DY : constant Fixed_16 :=
-                    Chain (Segment + 1).Y - Chain (Segment).Y;
-
-               begin
-                  if DX >= Zero then
-                     Initialize (Cursor.Column_Slope, DY, DX);
-                  else
-                     Initialize (Cursor.Column_Slope, -DY, -DX);
-                  end if;
-               end;
-
                --  Compute the intersection with the right boundary of the
                --  first cell exactly, from the left endpoint.
 
@@ -338,7 +348,7 @@ package body GFX.Rasteriser.DDA4 is
                  (Self       => Cursor.At_Column,
                   Out_Origin => State.Y_In,
                   In_Origin  => (if Left_Is_Top then X_Top else X_Bottom),
-                  Through    => Cursor.Column_Slope,
+                  Through    => Chain (Segment).Column_Slope,
                   In_Value   => Upper);
                Cursor.Column_Upper := Upper;
                Cursor.Has_Column   := True;
@@ -350,7 +360,7 @@ package body GFX.Rasteriser.DDA4 is
                --  the compiler to keep values in registers.
 
                declare
-                  Through : constant Slope := Cursor.Column_Slope;
+                  Through : constant Slope := Chain (Segment).Column_Slope;
                   At_Edge : Coordinate     := Cursor.At_Column;
                   Steps   : GX_Integer     :=
                     To_Pixel (Upper) - To_Pixel (Cursor.Column_Upper);
@@ -372,7 +382,7 @@ package body GFX.Rasteriser.DDA4 is
             end if;
 
             State.Y_Next := Cursor.At_Column;
-            State.Slope  := Cursor.Column_Slope;
+            State.Slope  := Chain (Segment).Column_Slope;
          end;
       end if;
    end Initialize_Portion;
@@ -941,6 +951,7 @@ package body GFX.Rasteriser.DDA4 is
       Right_Vertex : Vertex_Array (1 .. 4);
       Right_First  : Positive := 1;
       Right_Last   : Natural := 0;
+      Done         : Boolean := False;
 
       procedure Append_Left_Vertex (Point : GFX.Points.GF_Point);
 
@@ -952,6 +963,13 @@ package body GFX.Rasteriser.DDA4 is
          Last     : in out Natural;
          Y_Top    : Fixed_16;
          Y_Bottom : Fixed_16);
+
+      procedure Rasterize_Parallelogram;
+      --  Rasterize the rectangle inside of the rendering area. Its bottom
+      --  vertex is computed from the other ones, so the contour is an exact
+      --  parallelogram on the subpixel grid and its opposite sides share
+      --  slopes. Set Done unless the bottom vertex is outside of the
+      --  rendering area due to rounding.
 
       ------------------------
       -- Append_Left_Vertex --
@@ -966,7 +984,7 @@ package body GFX.Rasteriser.DDA4 is
             Y      => Y,
             Column => To_Pixel (X),
             Row    => To_Pixel (Y),
-            Row_Slope    => <>);
+            others => <>);
          pragma Warnings (On);
 
       begin
@@ -993,7 +1011,7 @@ package body GFX.Rasteriser.DDA4 is
             Y      => Snap_To_Subpixel (Point.Y),
             Column => To_Pixel (X),
             Row    => To_Pixel (Y),
-            Row_Slope    => <>);
+            others => <>);
          pragma Warnings (On);
 
       begin
@@ -1053,6 +1071,92 @@ package body GFX.Rasteriser.DDA4 is
          end loop;
       end Adjust_Y;
 
+      -----------------------------
+      -- Rasterize_Parallelogram --
+      -----------------------------
+
+      procedure Rasterize_Parallelogram is
+         Top          : Vertex renames Left_Vertex (1);
+         Left         : Vertex renames Left_Vertex (2);
+         Left_Bottom  : Vertex renames Left_Vertex (3);
+         Right_Top    : Vertex renames Right_Vertex (1);
+         Right        : Vertex renames Right_Vertex (2);
+         Right_Bottom : Vertex renames Right_Vertex (3);
+
+         procedure Set (Item : out Vertex; X : Fixed_16; Y : Fixed_16)
+           with Inline;
+
+         ---------
+         -- Set --
+         ---------
+
+         procedure Set (Item : out Vertex; X : Fixed_16; Y : Fixed_16) is
+         begin
+            Item.X      := X;
+            Item.Y      := Y;
+            Item.Column := To_Pixel (X);
+            Item.Row    := To_Pixel (Y);
+         end Set;
+
+      begin
+         Set
+           (Top,
+            Snap_To_Subpixel (Vertex_Top.X),
+            Snap_To_Subpixel (Vertex_Top.Y));
+         Set
+           (Left,
+            Snap_To_Subpixel (Vertex_Left.X),
+            Snap_To_Subpixel (Vertex_Left.Y));
+         Set
+           (Right,
+            Snap_To_Subpixel (Vertex_Right.X),
+            Snap_To_Subpixel (Vertex_Right.Y));
+
+         if Left.Y + Right.Y - Top.Y > Rendering_Y_Max then
+            return;
+         end if;
+
+         Done := True;
+
+         if Left.Y = Top.Y and Right.Y = Top.Y then
+            --  The rectangle is degenerated after snapping.
+
+            return;
+         end if;
+
+         Set (Left_Bottom, Left.X + Right.X - Top.X, Left.Y + Right.Y - Top.Y);
+
+         --  Sides Top-Left and Right-Bottom, as well as Left-Bottom and
+         --  Top-Right, are parallel and have equal slopes.
+
+         Initialize_Slopes (Top, Left);
+         Initialize_Slopes (Left, Left_Bottom);
+         Right.Row_Slope        := Top.Row_Slope;
+         Right.Column_Slope     := Top.Column_Slope;
+         Right_Top.X            := Top.X;
+         Right_Top.Y            := Top.Y;
+         Right_Top.Column       := Top.Column;
+         Right_Top.Row          := Top.Row;
+         Right_Top.Row_Slope    := Left.Row_Slope;
+         Right_Top.Column_Slope := Left.Column_Slope;
+         Right_Bottom.X         := Left_Bottom.X;
+         Right_Bottom.Y         := Left_Bottom.Y;
+         Right_Bottom.Column    := Left_Bottom.Column;
+         Right_Bottom.Row       := Left_Bottom.Row;
+
+         --  Horizontal sides are excluded from chains. When side Top-Left
+         --  is horizontal, Right-Bottom is horizontal too, and so on.
+
+         Rasterize_Contour
+           (Left_Vertex
+              ((if Left.Y = Top.Y then 2 else 1)
+               .. (if Right.Y = Top.Y then 2 else 3)),
+            Right_Vertex
+              ((if Right.Y = Top.Y then 2 else 1)
+               .. (if Left.Y = Top.Y then 2 else 3)),
+            Fill_Span);
+      end Rasterize_Parallelogram;
+
    begin
       if Width <= 0.0 or else Point_A = Point_B
         or else X_Min (Rendering_Area) = X_Max (Rendering_Area)
@@ -1094,6 +1198,24 @@ package body GFX.Rasteriser.DDA4 is
             Vertex_Right  := Point_Top + N;
             Vertex_Bottom := Point_Bottom + N;
             Vertex_Left   := Point_Bottom - N;
+         end if;
+
+         --  Fast path: the rectangle is inside of the rendering area, so
+         --  clipping is not needed and coordinates are valid. Rounding is
+         --  monotonic, so Vertex_Left and Vertex_Right are the leftmost and
+         --  the rightmost vertices, and Vertex_Top and Vertex_Bottom are the
+         --  topmost and the bottommost ones.
+
+         if X_Min (Rendering_Area) <= Vertex_Left.X
+           and Vertex_Right.X <= X_Max (Rendering_Area)
+           and Y_Min (Rendering_Area) <= Vertex_Top.Y
+           and Vertex_Bottom.Y <= Y_Max (Rendering_Area)
+         then
+            Rasterize_Parallelogram;
+
+            if Done then
+               return;
+            end if;
          end if;
 
          if not Is_Valid_Device_Pixel (Vertex_Top.X)
@@ -1347,27 +1469,11 @@ package body GFX.Rasteriser.DDA4 is
       --  4. Update edges' information
 
       for J in Left_First .. Left_Last - 1 loop
-         declare
-            DX : constant Fixed_16 :=
-              Left_Vertex (J + 1).X - Left_Vertex (J).X;
-            DY : constant Fixed_16 :=
-              Left_Vertex (J + 1).Y - Left_Vertex (J).Y;
-
-         begin
-            Initialize (Left_Vertex (J).Row_Slope, DX, DY);
-         end;
+         Initialize_Slopes (Left_Vertex (J), Left_Vertex (J + 1));
       end loop;
 
       for J in Right_First .. Right_Last - 1 loop
-         declare
-            DX : constant Fixed_16 :=
-              Right_Vertex (J + 1).X - Right_Vertex (J).X;
-            DY : constant Fixed_16 :=
-              Right_Vertex (J + 1).Y - Right_Vertex (J).Y;
-
-         begin
-            Initialize (Right_Vertex (J).Row_Slope, DX, DY);
-         end;
+         Initialize_Slopes (Right_Vertex (J), Right_Vertex (J + 1));
       end loop;
 
       --  5. Rasterize the closed contour between the two clipped chains.
@@ -1422,6 +1528,7 @@ package body GFX.Rasteriser.DDA4 is
          X_Max => Right,
          Y_Min => Top,
          Y_Max => Bottom);
+      Rendering_Y_Max := Pixel_Lower_Bound (Bottom);
 
       --  Clip_X_Lower_Bound := Pixel_Lower_Bound (Left);
    end Set_Rendering_Area;
