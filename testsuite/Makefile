@@ -6,6 +6,7 @@ build:
 
 run:
 	./bin/gf_clip_rectangle
+	./bin/rasteriser_rasterize_line
 	rm -rf output
 	mkdir output
 	(cd output && ../bin/radial_lines)
