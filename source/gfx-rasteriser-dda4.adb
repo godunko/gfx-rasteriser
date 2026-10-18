@@ -55,6 +55,13 @@ package body GFX.Rasteriser.DDA4 is
             Chain (Index).Y < Chain (Index + 1).Y);
       --  Horizontal and zero-length segments have already been removed.
 
+      function Only_First_Segment_Can_Move_Left
+        (Chain : Vertex_Array) return Boolean is
+        (for all Index in Chain'First + 1 .. Chain'Last - 1 =>
+            Chain (Index).X <= Chain (Index + 1).X);
+      --  The first segment may move left; all later segments are vertical
+      --  or move right.
+
       function Belongs_To_Pixel_Upper_Bound
         (Value : Fixed_16; Upper : Fixed_16) return Boolean is
          (Upper - One <= Value and Value < Upper);
@@ -161,8 +168,9 @@ package body GFX.Rasteriser.DDA4 is
       First_Column   : out GX_Integer;
       First_Coverage : out Cell_Coverage)
      with Pre => Row_Upper = Row_Lower + One
-       and then Left_Cursor.Segment /= 0
-       and then Right_Cursor.Segment /= 0;
+       and Left_Cursor.Segment /= 0
+       and Right_Cursor.Segment /= 0
+       and Ghost.Only_First_Segment_Can_Move_Left (Left);
    --  Consume only portions belonging to this row. Initialize and accumulate
    --  First_Coverage for First_Column = Left_Side.Column_First, without
    --  integrating or emitting it. Return column states for the current row
@@ -644,33 +652,23 @@ package body GFX.Rasteriser.DDA4 is
       First_Column   : out GX_Integer;
       First_Coverage : out Cell_Coverage)
    is
-      type Portion_Array is array (Positive range <>) of Segment_DDA;
-      Left_Portions  : Portion_Array (1 .. Left'Length - 1);
-      Right_Portions : Portion_Array (1 .. Right'Length - 1);
-      Left_Count     : Natural := 0;
-      Right_Count    : Natural := 0;
-      Column_Lower   : Fixed_16;
-      Column_Upper   : Fixed_16;
+      Column_Lower : Fixed_16;
+      Column_Upper : Fixed_16;
 
       procedure Collect
         (Chain    : Vertex_Array;
          Cursor   : in out Row_Cursor;
-         Portions : out Portion_Array;
-         Count    : out Natural;
+         Reversed : Boolean;
          Side     : out Row_Side);
 
-      procedure Accumulate_First
-        (Chain    : Vertex_Array;
-         Portions : in out Portion_Array;
-         Count    : Natural;
-         Reversed : Boolean;
-         Side     : in out Row_Side);
+      -------------
+      -- Collect --
+      -------------
 
       procedure Collect
         (Chain    : Vertex_Array;
          Cursor   : in out Row_Cursor;
-         Portions : out Portion_Array;
-         Count    : out Natural;
+         Reversed : Boolean;
          Side     : out Row_Side)
       is
          procedure Prepare_Intersection (Boundary : Fixed_16);
@@ -686,7 +684,6 @@ package body GFX.Rasteriser.DDA4 is
          end Prepare_Intersection;
 
       begin
-         Count := 0;
          Side := (others => <>);
 
          while Cursor.Segment /= 0 loop
@@ -694,6 +691,7 @@ package body GFX.Rasteriser.DDA4 is
                Index : constant Positive := Cursor.Segment;
                Last  : Vertex renames Chain (Index + 1);
                Part  : Segment_DDA;
+
             begin
                pragma Assert (Row_Lower <= Cursor.Y);
                pragma Assert (Cursor.Y < Last.Y);
@@ -706,14 +704,13 @@ package body GFX.Rasteriser.DDA4 is
                   if Row_Upper < Last.Y then
                      Part.X_Bottom := Cursor.At_Row_Upper;
                      Part.Y_Bottom := Row_Upper;
+
                   else
                      Part.X_Bottom := Last.X;
                      Part.Y_Bottom := Last.Y;
                   end if;
 
                   Set_Column_Range (Part);
-                  Count := @ + 1;
-                  Portions (Count) := Part;
 
                   if Side.First_Segment = 0 then
                      Side.First_Segment := Index;
@@ -721,6 +718,15 @@ package body GFX.Rasteriser.DDA4 is
                      Side.First_Y := Part.Y_Top;
                      Side.Column_First := Part.Column_First;
                      Side.Column_Last := Part.Column_Last;
+
+                     if Reversed then
+                        --  Only the first left portion can move left. Later
+                        --  portions are vertical or move right, so its range
+                        --  determines the first cell of this row.
+                        First_Column := Part.Column_First;
+                        Column_Lower := Pixel_Lower_Bound (First_Column);
+                        Column_Upper := Column_Lower + One;
+                     end if;
                   else
                      Side.Column_First := GX_Integer'Min
                        (Side.Column_First, Part.Column_First);
@@ -731,6 +737,77 @@ package body GFX.Rasteriser.DDA4 is
                   Side.Last_Segment := Index;
                   Side.Last_X := Part.X_Bottom;
                   Side.Last_Y := Part.Y_Bottom;
+
+                  pragma Assert (First_Column <= Part.Column_First);
+
+                  declare
+                     X_Top : Fixed_16 := Part.X_Top;
+                     Y_Top : Fixed_16 := Part.Y_Top;
+                     X_Bottom : Fixed_16 := Part.X_Bottom;
+                     Y_Bottom : Fixed_16 := Part.Y_Bottom;
+                     X_Min : constant Fixed_16 := Min (X_Top, X_Bottom);
+                     X_Max : constant Fixed_16 := Max (X_Top, X_Bottom);
+
+                  begin
+                     --  Keep indices for portions starting in later cells.
+                     if Part.Column_First > First_Column then
+                        Side.Pending := Side.Pending
+                          or 2 ** (Part.Segment - Chain'First);
+
+                        if Part.Column_First < Side.Next_Column then
+                           Side.Next_Column := Part.Column_First;
+                           Side.Next_Segment := Part.Segment;
+                        end if;
+
+                     else
+                        if X_Min <= Column_Lower
+                          and Column_Lower <= X_Max
+                        then
+                           Part.At_Column_Lower :=
+                             Intersection_Y (Chain, Part, Column_Lower);
+                        end if;
+
+                        if X_Min <= Column_Upper
+                          and Column_Upper <= X_Max
+                        then
+                           Part.At_Column_Upper :=
+                             Intersection_Y (Chain, Part, Column_Upper);
+                        end if;
+
+                        if X_Top > Column_Upper then
+                           X_Top := Column_Upper;
+                           Y_Top := Part.At_Column_Upper;
+                        elsif X_Top < Column_Lower then
+                           X_Top := Column_Lower;
+                           Y_Top := Part.At_Column_Lower;
+                        end if;
+
+                        if X_Bottom > Column_Upper then
+                           X_Bottom := Column_Upper;
+                           Y_Bottom := Part.At_Column_Upper;
+                        elsif X_Bottom < Column_Lower then
+                           X_Bottom := Column_Lower;
+                           Y_Bottom := Part.At_Column_Lower;
+                        end if;
+
+                        if Reversed then
+                           Accumulate (First_Coverage, Column_Upper,
+                             X_Bottom, Y_Bottom, X_Top, Y_Top);
+                        else
+                           Accumulate (First_Coverage, Column_Upper,
+                             X_Top, Y_Top, X_Bottom, Y_Bottom);
+                        end if;
+
+                        if First_Column < Part.Column_Last then
+                           if Side.Top_Segment.Segment = 0 then
+                              Side.Top_Segment := Part;
+                           else
+                              pragma Assert (Side.Bottom_Segment.Segment = 0);
+                              Side.Bottom_Segment := Part;
+                           end if;
+                        end if;
+                     end if;
+                  end;
 
                   if Row_Upper < Last.Y then
                      Cursor.X := Part.X_Bottom;
@@ -783,102 +860,14 @@ package body GFX.Rasteriser.DDA4 is
          end loop;
       end Collect;
 
-      procedure Accumulate_First
-        (Chain    : Vertex_Array;
-         Portions : in out Portion_Array;
-         Count    : Natural;
-         Reversed : Boolean;
-         Side     : in out Row_Side)
-      is
-      begin
-         for J in 1 .. Count loop
-            declare
-               Part : Segment_DDA renames Portions (J);
-               X_Top : Fixed_16 := Part.X_Top;
-               Y_Top : Fixed_16 := Part.Y_Top;
-               X_Bottom : Fixed_16 := Part.X_Bottom;
-               Y_Bottom : Fixed_16 := Part.Y_Bottom;
-               X_Min : constant Fixed_16 := Min (X_Top, X_Bottom);
-               X_Max : constant Fixed_16 := Max (X_Top, X_Bottom);
-
-            begin
-               --  Keep only indices for portions starting in later cells.
-               if Part.Column_First > First_Column then
-                  Side.Pending := Side.Pending
-                    or 2 ** (Part.Segment - Chain'First);
-
-                  if Part.Column_First < Side.Next_Column then
-                     Side.Next_Column := Part.Column_First;
-                     Side.Next_Segment := Part.Segment;
-                  end if;
-
-               else
-                  if X_Min <= Column_Lower
-                    and then Column_Lower <= X_Max
-                  then
-                     Part.At_Column_Lower :=
-                       Intersection_Y (Chain, Part, Column_Lower);
-                  end if;
-
-                  if X_Min <= Column_Upper
-                    and then Column_Upper <= X_Max
-                  then
-                     Part.At_Column_Upper :=
-                       Intersection_Y (Chain, Part, Column_Upper);
-                  end if;
-
-                  if X_Top > Column_Upper then
-                     X_Top := Column_Upper;
-                     Y_Top := Part.At_Column_Upper;
-                  elsif X_Top < Column_Lower then
-                     X_Top := Column_Lower;
-                     Y_Top := Part.At_Column_Lower;
-                  end if;
-
-                  if X_Bottom > Column_Upper then
-                     X_Bottom := Column_Upper;
-                     Y_Bottom := Part.At_Column_Upper;
-                  elsif X_Bottom < Column_Lower then
-                     X_Bottom := Column_Lower;
-                     Y_Bottom := Part.At_Column_Lower;
-                  end if;
-
-                  if Reversed then
-                     Accumulate (First_Coverage, Column_Upper,
-                       X_Bottom, Y_Bottom, X_Top, Y_Top);
-                  else
-                     Accumulate (First_Coverage, Column_Upper,
-                       X_Top, Y_Top, X_Bottom, Y_Bottom);
-                  end if;
-
-                  if First_Column < Part.Column_Last then
-                     if Side.Top_Segment.Segment = 0 then
-                        Side.Top_Segment := Part;
-                     else
-                        pragma Assert (Side.Bottom_Segment.Segment = 0);
-                        Side.Bottom_Segment := Part;
-                     end if;
-                  end if;
-               end if;
-            end;
-         end loop;
-      end Accumulate_First;
-
    begin
-      Collect (Left, Left_Cursor, Left_Portions, Left_Count, Left_Side);
-      Collect (Right, Right_Cursor, Right_Portions, Right_Count, Right_Side);
-      pragma Assert (Left_Count > 0 and then Right_Count > 0);
+      First_Coverage := (Zero, Zero);
+      Collect (Left, Left_Cursor, True, Left_Side);
+      Collect (Right, Right_Cursor, False, Right_Side);
+      pragma Assert
+        (Left_Side.First_Segment /= 0 and Right_Side.First_Segment /= 0);
       pragma Assert (Left_Side.Column_First <= Right_Side.Column_First);
 
-      First_Column := Left_Side.Column_First;
-      Column_Lower := Pixel_Lower_Bound (First_Column);
-      Column_Upper := Column_Lower + One;
-      First_Coverage := (Zero, Zero);
-
-      --  Only the already clipped portions are visited here. No chain is
-      --  scanned twice, and row intersections are not recomputed.
-      Accumulate_First (Left, Left_Portions, Left_Count, True, Left_Side);
-      Accumulate_First (Right, Right_Portions, Right_Count, False, Right_Side);
       Update_Change (Left_Side);
       Update_Change (Right_Side);
    end Prepare_Row;
