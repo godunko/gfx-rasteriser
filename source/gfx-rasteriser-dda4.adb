@@ -22,6 +22,13 @@ package body GFX.Rasteriser.DDA4 is
    use GFX.Implementation.Fixed_Types;
    use GFX.Implementation.Subpixel_Operations;
 
+   type Cell_Coverage is record
+      Coverage   : Fixed_6;
+      --  Vertical height of the line inside the cell.
+      Twice_Area : Fixed_12;
+      --  Twice the signed area of the trapezoid matching the right edge.
+   end record;
+
    type Vertex is record
       X      : Fixed_16;
       Y      : Fixed_16;
@@ -129,16 +136,19 @@ package body GFX.Rasteriser.DDA4 is
    --  equal, keep the single column containing the vertical portion; on a
    --  boundary, this is the column to its right.
 
+   procedure Accumulate_Interior
+     (Chain    : Vertex_Array;
+      Part     : in out Segment_DDA;
+      Reversed : Boolean;
+      Coverage : in out Cell_Coverage);
+   --  Advance Part's column intersections by one pixel and add its signed
+   --  height and twice-area to Coverage. Both boundaries of the new cell
+   --  must intersect the same segment, with no endpoint or activation event
+   --  in this cell. Reversed traverses the segment against chain order.
+
    --  Initialize once before the first row.
 
    Rendering_Area : GFX.Implementation.Clipping.GF_Clipping_Rectangle;
-
-   type Cell_Coverage is record
-      Coverage   : Fixed_6;
-      --  Vertical height of the line inside the cell.
-      Twice_Area : Fixed_12;
-      --  Twice the signed area of the trapezoid matching the right edge.
-   end record;
 
    type Segment_Set is mod 2 ** 3;
    --  One bit per possible segment of a clipped rectangle side. This stores
@@ -252,6 +262,8 @@ package body GFX.Rasteriser.DDA4 is
       Coverage    : Cell_Coverage;
       Alpha       : out Grayscale) with Export;
 
+   procedure Step_Column (Part : in out Segment_DDA; Step : Fixed_16);
+
    ----------------
    -- Accumulate --
    ----------------
@@ -271,6 +283,40 @@ package body GFX.Rasteriser.DDA4 is
       Self.Twice_Area :=
         @ + Delta_Y * Floor ((Column_Upper - X_1) + (Column_Upper - X_2));
    end Accumulate;
+
+   -------------------------
+   -- Accumulate_Interior --
+   -------------------------
+
+   procedure Accumulate_Interior
+     (Chain    : Vertex_Array;
+      Part     : in out Segment_DDA;
+      Reversed : Boolean;
+      Coverage : in out Cell_Coverage)
+   is
+      Delta_Y : Fixed_6;
+
+   begin
+      --  Both cell boundaries intersect this segment. Membership and
+      --  endpoint checks are performed only in columns where states change.
+
+      Step_Column (Part, Chain (Part.Segment).Step_Y);
+
+      Delta_Y := Floor (Part.At_Column_Upper) - Floor (Part.At_Column_Lower);
+
+      --  The difference follows increasing X. Reverse its sign when the
+      --  contour traverses this portion from right to left.
+      if not ((Part.X_Top < Part.X_Bottom) xor Reversed) then
+         Delta_Y := Zero - Delta_Y;
+      end if;
+
+      --  The endpoints lie on opposite cell boundaries, so the factor
+      --  (Column_Upper - X_1) + (Column_Upper - X_2) is exactly one pixel.
+      --  Multiplying by Fixed_6 One converts the signed height to Fixed_12
+      --  twice-area units, preserving the rounding used by Accumulate.
+      Coverage.Coverage   := @ + Delta_Y;
+      Coverage.Twice_Area := @ + Delta_Y * One;
+   end Accumulate_Interior;
 
    ---------------------------
    -- Belongs_To_Same_Pixel --
@@ -943,36 +989,9 @@ package body GFX.Rasteriser.DDA4 is
             Min (Part.Y_Bottom - Part.At_Column_Lower, Step));
    end Step_Column;
 
-   -------------------------
-   -- Accumulate_Interior --
-   -------------------------
-
-   procedure Accumulate_Interior
-     (Chain        : Vertex_Array;
-      Part         : in out Segment_DDA;
-      Column_Upper : Fixed_16;
-      Reversed     : Boolean;
-      Coverage     : in out Cell_Coverage)
-   is
-   begin
-      --  Both cell boundaries intersect this segment. Membership and
-      --  endpoint checks are performed only in columns where states change.
-      Step_Column (Part, Chain (Part.Segment).Step_Y);
-
-      if (Part.X_Top < Part.X_Bottom) xor Reversed then
-         Accumulate (Coverage, Column_Upper,
-           Column_Upper - One, Part.At_Column_Lower,
-           Column_Upper, Part.At_Column_Upper);
-      else
-         Accumulate (Coverage, Column_Upper,
-           Column_Upper, Part.At_Column_Upper,
-           Column_Upper - One, Part.At_Column_Lower);
-      end if;
-   end Accumulate_Interior;
-
-   ---------------------
+   -----------------------
    -- Accumulate_Change --
-   ---------------------
+   -----------------------
 
    procedure Accumulate_Change
      (Chain        : Vertex_Array;
@@ -1091,6 +1110,10 @@ package body GFX.Rasteriser.DDA4 is
       procedure Add_Right_One;
       procedure Add_Right_Two;
 
+      ----------
+      -- Emit --
+      ----------
+
       procedure Emit (Width : Device_Pixel_Count := 1) is
       begin
          Integrate (Accumulator, Coverage, Alpha);
@@ -1108,27 +1131,27 @@ package body GFX.Rasteriser.DDA4 is
       procedure Add_Left_One is
       begin
          Accumulate_Interior (Left, Left_Side.Top_Segment,
-           Column_Upper, True, Coverage);
+           True, Coverage);
       end Add_Left_One;
 
       procedure Add_Left_Two is
       begin
          Add_Left_One;
          Accumulate_Interior (Left, Left_Side.Bottom_Segment,
-           Column_Upper, True, Coverage);
+           True, Coverage);
       end Add_Left_Two;
 
       procedure Add_Right_One is
       begin
          Accumulate_Interior (Right, Right_Side.Top_Segment,
-           Column_Upper, False, Coverage);
+           False, Coverage);
       end Add_Right_One;
 
       procedure Add_Right_Two is
       begin
          Add_Right_One;
          Accumulate_Interior (Right, Right_Side.Bottom_Segment,
-           Column_Upper, False, Coverage);
+           False, Coverage);
       end Add_Right_Two;
 
       generic
@@ -1219,6 +1242,7 @@ package body GFX.Rasteriser.DDA4 is
 
          Column_Upper := Pixel_Lower_Bound (Column) + One;
          Emit;
+
          Column := @ + 1;
          Column_Upper := @ + One;
 
@@ -1233,6 +1257,7 @@ package body GFX.Rasteriser.DDA4 is
 
                if Column < Change then
                   Draw_Interior (Change - 1);
+
                else
                   Coverage := (Zero, Zero);
                   Accumulate_Change (Left, Left_Side, Column,
