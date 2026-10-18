@@ -49,20 +49,11 @@ package body GFX.Rasteriser.DDA4 is
 
       --  Provides functions to makes predicates more readable.
 
-      function Has_Nondecreasing_Y (Chain : Vertex_Array) return Boolean is
+      function Has_Strictly_Increasing_Y
+        (Chain : Vertex_Array) return Boolean is
         (for all Index in Chain'First .. Chain'Last - 1 =>
-            Chain (Index).Y <= Chain (Index + 1).Y);
-      --  Horizontal segments are permitted. They represent the top or bottom
-      --  end of an axis-aligned or clipped rectangle.
-
-      function Has_Unique_Coordinates (Chain : Vertex_Array) return Boolean is
-        (for all Left_Index in Chain'Range =>
-           (for all Right_Index in Chain'Range =>
-              Left_Index = Right_Index
-                or else Chain (Left_Index).X /= Chain (Right_Index).X
-                or else Chain (Left_Index).Y /= Chain (Right_Index).Y));
-      --  No two vertices denote the same point. Equal X or equal Y coordinates
-      --  alone are valid for vertical and horizontal segments.
+            Chain (Index).Y < Chain (Index + 1).Y);
+      --  Horizontal and zero-length segments have already been removed.
 
    end Ghost;
 
@@ -77,14 +68,9 @@ package body GFX.Rasteriser.DDA4 is
      with Pre =>
        Left'Length in 2 .. 4 and Right'Length in 2 .. 4
        --  Both vertex lists contain at least one edge.
-       and Ghost.Has_Nondecreasing_Y (Left)
-       and Ghost.Has_Nondecreasing_Y (Right)
-       --  Vertices in both chains are ordered from top to bottom. Strict
-       --  ordering is not required because a chain may contain a horizontal
-       --  rectangle end segment.
-       and Ghost.Has_Unique_Coordinates (Left)
-       and Ghost.Has_Unique_Coordinates (Right)
-       --  Repeated points would create zero-length segments.
+       and Ghost.Has_Strictly_Increasing_Y (Left)
+       and Ghost.Has_Strictly_Increasing_Y (Right)
+       --  Vertices in both chains are strictly ordered from top to bottom.
        and Left (Left'First).Y = Right (Right'First).Y
        and Left (Left'Last).Y = Right (Right'Last).Y
        --  Top and bottom segments between left and right edge lists are
@@ -95,7 +81,7 @@ package body GFX.Rasteriser.DDA4 is
      (Chain     : Vertex_Array;
       Row_Upper : Fixed_16;
       Cursor    : out Row_Cursor);
-   --  Initialize once before the first row; skip leading horizontal edges.
+   --  Initialize once before the first row.
 
    Rendering_Area : GFX.Implementation.Clipping.GF_Clipping_Rectangle;
 
@@ -136,8 +122,7 @@ package body GFX.Rasteriser.DDA4 is
       Last_X         : Fixed_16 := Zero;
       Last_Y         : Fixed_16 := Zero;
       --  Full range and clipped endpoints for this row, including portions
-      --  lying entirely to the right of the first cell. Horizontal segments
-      --  inside the range must be skipped when traversing columns.
+      --  lying entirely to the right of the first cell.
       --  If two left portions cross the first cell's right boundary, only
       --  the right side can have additional, entirely deferred portions.
       Column_First   : GX_Integer := 0;
@@ -174,7 +159,7 @@ package body GFX.Rasteriser.DDA4 is
       Row_Lower   : Fixed_16;
       Row_Upper   : Fixed_16) return Boolean;
    --  Return True when the current segment crosses the complete row and no
-   --  segment switch or horizontal edge can occur in it.
+   --  segment switch can occur in it.
 
    procedure Prepare_Simple_Row
      (Left           : Vertex_Array;
@@ -441,20 +426,10 @@ package body GFX.Rasteriser.DDA4 is
       Row_Upper : Fixed_16;
       Cursor    : out Row_Cursor)
    is
-      Index : Positive := Chain'First;
+      Index : constant Positive := Chain'First;
 
    begin
       Cursor := (others => <>);
-
-      while Index < Chain'Last
-        and then Chain (Index).Y = Chain (Index + 1).Y
-      loop
-         Index := @ + 1;
-      end loop;
-
-      if Index = Chain'Last then
-         return;
-      end if;
 
       Cursor.Segment := Index;
       Cursor.X := Chain (Index).X;
@@ -711,8 +686,9 @@ package body GFX.Rasteriser.DDA4 is
                Part  : Segment_DDA;
             begin
                pragma Assert (Row_Lower <= Cursor.Y);
+               pragma Assert (Cursor.Y < Last.Y);
 
-               if Cursor.Y < Row_Upper and then Cursor.Y < Last.Y then
+               if Cursor.Y < Row_Upper then
                   Part.Segment := Index;
                   Part.X_Top := Cursor.X;
                   Part.Y_Top := Cursor.Y;
@@ -768,7 +744,7 @@ package body GFX.Rasteriser.DDA4 is
                   end if;
                end if;
 
-               if Row_Upper <= Cursor.Y and then Cursor.Y < Last.Y then
+               if Row_Upper <= Cursor.Y then
                   --  A newly selected segment starts in the next row.
                   if Row_Upper + One < Last.Y then
                      Prepare_Intersection (Row_Upper + One);
@@ -779,7 +755,7 @@ package body GFX.Rasteriser.DDA4 is
                   return;
                end if;
 
-               --  Consume a finished or horizontal segment exactly once.
+               --  Consume a finished segment exactly once.
                if Index + 1 = Chain'Last then
                   Cursor := (others => <>);
                else
@@ -1390,15 +1366,18 @@ package body GFX.Rasteriser.DDA4 is
             Chain (Last).Row := To_Pixel (Y_Bottom);
          end if;
 
-         --  Adjusted endpoints can coincide with their neighbours.
+         --  Snapping can make either end of either chain horizontal,
+         --  independently of the other chain. Keep the endpoint belonging
+         --  to the adjacent nonhorizontal segment. This also removes
+         --  endpoints that coincide with their neighbours after adjustment.
 
-         if First < Last and then Chain (First) = Chain (First + 1) then
+         while First < Last and then Chain (First).Y = Chain (First + 1).Y loop
             First := @ + 1;
-         end if;
+         end loop;
 
-         if First < Last and then Chain (Last) = Chain (Last - 1) then
+         while First < Last and then Chain (Last).Y = Chain (Last - 1).Y loop
             Last := @ - 1;
-         end if;
+         end loop;
       end Adjust_Y;
 
    begin
