@@ -124,6 +124,34 @@ package body GFX.Rasteriser.DDA4 is
    --  integrating or emitting it. Return column states for the current row
    --  and advance both cursors to the next row (or mark them exhausted).
 
+   function Can_Prepare_Simple_Row
+     (Chain       : Vertex_Array;
+      Cursor      : Row_Cursor;
+      Row_Lower   : Fixed_16;
+      Row_Upper   : Fixed_16) return Boolean;
+   --  Return True when the current segment crosses the complete row and no
+   --  segment switch or horizontal edge can occur in it.
+
+   procedure Prepare_Simple_Row
+     (Left           : Vertex_Array;
+      Right          : Vertex_Array;
+      Row_Lower      : Fixed_16;
+      Row_Upper      : Fixed_16;
+      Left_Cursor    : in out Row_Cursor;
+      Right_Cursor   : in out Row_Cursor;
+      Left_Side      : out Row_Side;
+      Right_Side     : out Row_Side;
+      First_Column   : out GX_Integer;
+      First_Coverage : out Cell_Coverage)
+     with Pre => Row_Upper = Row_Lower + One
+       and then Can_Prepare_Simple_Row
+         (Left, Left_Cursor, Row_Lower, Row_Upper)
+       and then Can_Prepare_Simple_Row
+         (Right, Right_Cursor, Row_Lower, Row_Upper);
+   --  Fast path for the common case of one segment per side crossing the
+   --  complete row. It avoids portion arrays, segment scans and pending-set
+   --  searches while producing the same column state as Prepare_Row.
+
    function Belongs_To_Same_Pixel (A : Fixed_16; B : Fixed_16) return Boolean;
    --  Return True if there is an integer N such that both A and B lie in
    --  the closed interval [N, N + 1] along one axis. Either coordinate may
@@ -400,6 +428,176 @@ package body GFX.Rasteriser.DDA4 is
          end;
       end if;
    end Initialize_Row_Cursor;
+
+   ----------------------------
+   -- Can_Prepare_Simple_Row --
+   ----------------------------
+
+   function Can_Prepare_Simple_Row
+     (Chain       : Vertex_Array;
+      Cursor      : Row_Cursor;
+      Row_Lower   : Fixed_16;
+      Row_Upper   : Fixed_16) return Boolean
+   is
+   begin
+      return Cursor.Segment /= 0
+        and then Cursor.Y = Row_Lower
+        and then Row_Upper < Chain (Cursor.Segment + 1).Y;
+   end Can_Prepare_Simple_Row;
+
+   ------------------------
+   -- Prepare_Simple_Row --
+   ------------------------
+
+   procedure Prepare_Simple_Row
+     (Left           : Vertex_Array;
+      Right          : Vertex_Array;
+      Row_Lower      : Fixed_16;
+      Row_Upper      : Fixed_16;
+      Left_Cursor    : in out Row_Cursor;
+      Right_Cursor   : in out Row_Cursor;
+      Left_Side      : out Row_Side;
+      Right_Side     : out Row_Side;
+      First_Column   : out GX_Integer;
+      First_Coverage : out Cell_Coverage)
+   is
+      Left_Part, Right_Part : Segment_DDA;
+      Column_Lower          : Fixed_16;
+      Column_Upper          : Fixed_16;
+
+      procedure Prepare_Side
+        (Chain  : Vertex_Array;
+         Cursor : in out Row_Cursor;
+         Side   : out Row_Side;
+         Part   : out Segment_DDA);
+
+      procedure Accumulate_First
+        (Chain    : Vertex_Array;
+         Part     : in out Segment_DDA;
+         Reversed : Boolean;
+         Side     : in out Row_Side);
+
+      procedure Prepare_Side
+        (Chain  : Vertex_Array;
+         Cursor : in out Row_Cursor;
+         Side   : out Row_Side;
+         Part   : out Segment_DDA)
+      is
+         Index : constant Positive := Cursor.Segment;
+         Last  : Vertex renames Chain (Index + 1);
+      begin
+         Part :=
+           (Segment         => Index,
+            X_Top           => Cursor.X,
+            Y_Top           => Row_Lower,
+            X_Bottom        => Cursor.At_Row_Upper,
+            Y_Bottom        => Row_Upper,
+            At_Column_Lower => Zero,
+            At_Column_Upper => Zero,
+            Column_First    => 0,
+            Column_Last     => -1);
+         Set_Column_Range (Part);
+
+         Side := (others => <>);
+         Side.First_Segment := Index;
+         Side.Last_Segment := Index;
+         Side.First_X := Part.X_Top;
+         Side.First_Y := Part.Y_Top;
+         Side.Last_X := Part.X_Bottom;
+         Side.Last_Y := Part.Y_Bottom;
+         Side.Column_First := Part.Column_First;
+         Side.Column_Last := Part.Column_Last;
+
+         Cursor.X := Part.X_Bottom;
+         Cursor.Y := Row_Upper;
+
+         if Row_Upper + One < Last.Y then
+            declare
+               DX : constant Fixed_16 := Last.X - Cursor.X;
+            begin
+               Cursor.At_Row_Upper := Cursor.X
+                 + Max (Min (Zero, DX),
+                     Min (Max (Zero, DX), Chain (Index).Step_X));
+            end;
+         else
+            Cursor.At_Row_Upper := Zero;
+         end if;
+      end Prepare_Side;
+
+      procedure Accumulate_First
+        (Chain    : Vertex_Array;
+         Part     : in out Segment_DDA;
+         Reversed : Boolean;
+         Side     : in out Row_Side)
+      is
+         X_Top    : Fixed_16 := Part.X_Top;
+         Y_Top    : Fixed_16 := Part.Y_Top;
+         X_Bottom : Fixed_16 := Part.X_Bottom;
+         Y_Bottom : Fixed_16 := Part.Y_Bottom;
+         X_Min    : constant Fixed_16 := Min (X_Top, X_Bottom);
+         X_Max    : constant Fixed_16 := Max (X_Top, X_Bottom);
+      begin
+         if Part.Column_First > First_Column then
+            Side.Pending := 2 ** (Part.Segment - Chain'First);
+            Side.Next_Segment := Part.Segment;
+            Side.Next_Column := Part.Column_First;
+
+         else
+            if X_Min <= Column_Lower and then Column_Lower <= X_Max then
+               Part.At_Column_Lower :=
+                 Intersection_Y (Chain, Part, Column_Lower);
+            end if;
+
+            if X_Min <= Column_Upper and then Column_Upper <= X_Max then
+               Part.At_Column_Upper :=
+                 Intersection_Y (Chain, Part, Column_Upper);
+            end if;
+
+            if X_Top > Column_Upper then
+               X_Top := Column_Upper;
+               Y_Top := Part.At_Column_Upper;
+            elsif X_Top < Column_Lower then
+               X_Top := Column_Lower;
+               Y_Top := Part.At_Column_Lower;
+            end if;
+
+            if X_Bottom > Column_Upper then
+               X_Bottom := Column_Upper;
+               Y_Bottom := Part.At_Column_Upper;
+            elsif X_Bottom < Column_Lower then
+               X_Bottom := Column_Lower;
+               Y_Bottom := Part.At_Column_Lower;
+            end if;
+
+            if Reversed then
+               Accumulate (First_Coverage, Column_Upper,
+                 X_Bottom, Y_Bottom, X_Top, Y_Top);
+            else
+               Accumulate (First_Coverage, Column_Upper,
+                 X_Top, Y_Top, X_Bottom, Y_Bottom);
+            end if;
+
+            if First_Column < Part.Column_Last then
+               Side.Top_Segment := Part;
+            end if;
+         end if;
+
+         Update_Change (Side);
+      end Accumulate_First;
+
+   begin
+      Prepare_Side (Left, Left_Cursor, Left_Side, Left_Part);
+      Prepare_Side (Right, Right_Cursor, Right_Side, Right_Part);
+      pragma Assert (Left_Side.Column_First <= Right_Side.Column_First);
+
+      First_Column := Left_Side.Column_First;
+      Column_Lower := Pixel_Lower_Bound (First_Column);
+      Column_Upper := Column_Lower + One;
+      First_Coverage := (Zero, Zero);
+
+      Accumulate_First (Left, Left_Part, True, Left_Side);
+      Accumulate_First (Right, Right_Part, False, Right_Side);
+   end Prepare_Simple_Row;
 
    -----------------
    -- Prepare_Row --
@@ -984,8 +1182,21 @@ package body GFX.Rasteriser.DDA4 is
 
       while Left_Cursor.Segment /= 0 and Right_Cursor.Segment /= 0 loop
          Accumulator := Zero;
-         Prepare_Row (Left, Right, Row_Lower, Row_Upper,
-           Left_Cursor, Right_Cursor, Left_Side, Right_Side, Column, Coverage);
+
+         if Can_Prepare_Simple_Row
+              (Left, Left_Cursor, Row_Lower, Row_Upper)
+           and then Can_Prepare_Simple_Row
+             (Right, Right_Cursor, Row_Lower, Row_Upper)
+         then
+            Prepare_Simple_Row (Left, Right, Row_Lower, Row_Upper,
+              Left_Cursor, Right_Cursor, Left_Side, Right_Side,
+              Column, Coverage);
+         else
+            Prepare_Row (Left, Right, Row_Lower, Row_Upper,
+              Left_Cursor, Right_Cursor, Left_Side, Right_Side,
+              Column, Coverage);
+         end if;
+
          Column_Upper := Pixel_Lower_Bound (Column) + One;
          Emit;
          Column := @ + 1;
