@@ -1,17 +1,22 @@
 --
---  Copyright (C) 2024, Vadim Godunko <vgodunko@gmail.com>
+--  Copyright (C) 2024-2026, Vadim Godunko <vgodunko@gmail.com>
 --
 --  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 --
 
---  This package provides subprograms to help to rasterize basic geometric
---  primitives on grayscale pixel buffers.
+--  Experimental area rasterizer for a line's closed rectangular contour.
+--  Vertices use a 64x64 subpixel grid; DDA intersections retain 16-bit
+--  fractional precision. No pixel buffer or dynamic allocation is needed.
 --
---  These subprograms need to be combined with color scaling and color blending
---  subprograms to draw real image.
---
---  Access to span draw subprogram versus generic with formal span draw
---  subprogram is selected to have minimal code footprint.
+--  The rasterizer uses a DDA (Digital Differential Analyzer) approach to
+--  compute intersections of the line with the pixel grid. Intersections are
+--  exact: they are represented by values rounded toward negative infinity
+--  to `Fixed_16` precision together with remainders of this rounding, see
+--  `GFX.Implementation.Fixed_Types.Exact_DDA`, so no error is accumulated
+--  while stepping along the edge, and slopes are not quantized. Only the
+--  rounded values are used by coverage computations, so each intersection
+--  has an error less than 1 / 65_536 pixel. Coverage arithmetic truncates
+--  to 1/64 subpixel precision.
 
 pragma Restrictions (No_Elaboration_Code);
 
@@ -21,11 +26,12 @@ package GFX.Rasteriser.Primitives
   with Preelaborate
 is
 
-   type Fill_Span_Subprogram is
-     access procedure (X        : GFX.Rasteriser.Device_Pixel_Index;
-                       Y        : GFX.Rasteriser.Device_Pixel_Index;
-                       Width    : GFX.Rasteriser.Device_Pixel_Count;
-                       Coverage : GFX.Rasteriser.Grayscale);
+   procedure Set_Rendering_Area
+     (Top    : GFX.Rasteriser.Device_Pixel_Index;
+      Left   : GFX.Rasteriser.Device_Pixel_Index;
+      Right  : GFX.Rasteriser.Device_Pixel_Index;
+      Bottom : GFX.Rasteriser.Device_Pixel_Index)
+     with Pre => Top >= 0 and Left >= 0 and Left <= Right and Top <= Bottom;
 
    procedure Rasterize_Line
      (Point_A   : GFX.Points.GF_Point;
@@ -36,29 +42,7 @@ is
          Y        : GFX.Rasteriser.Device_Pixel_Index;
          Width    : GFX.Rasteriser.Device_Pixel_Count;
          Coverage : GFX.Rasteriser.Grayscale));
-      --  Draw_Span : not null Draw_Span_Subprogram);
    --  Draw straight line between given two points of the given width. It
    --  supports anti-aliasing.
-
-   procedure Set_Rendering_Area
-     (Top    : GFX.Rasteriser.Device_Pixel_Index;
-      Left   : GFX.Rasteriser.Device_Pixel_Index;
-      Right  : GFX.Rasteriser.Device_Pixel_Index;
-      Bottom : GFX.Rasteriser.Device_Pixel_Index);
-
-private
-
-   procedure Internal_Fill_Rectangle
-     (Top       : GFX.Rasteriser.Device_Pixel_Coordinate;
-      Left      : GFX.Rasteriser.Device_Pixel_Coordinate;
-      Right     : GFX.Rasteriser.Device_Pixel_Coordinate;
-      Bottom    : GFX.Rasteriser.Device_Pixel_Coordinate;
-      Fill_Span : not null access procedure
-        (X        : GFX.Rasteriser.Device_Pixel_Index;
-         Y        : GFX.Rasteriser.Device_Pixel_Index;
-         Width    : GFX.Rasteriser.Device_Pixel_Count;
-         Coverage : GFX.Rasteriser.Grayscale));
-      --  Draw_Span : not null Draw_Span_Subprogram);
-   --  Draw rectangle.
 
 end GFX.Rasteriser.Primitives;
