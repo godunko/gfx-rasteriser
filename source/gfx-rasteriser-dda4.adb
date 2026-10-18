@@ -159,6 +159,7 @@ package body GFX.Rasteriser.DDA4 is
       Bottom_Segment : Segment_DDA;
       --  Portions extending across the last processed cell's right boundary,
       --  in chain order. Only Top_Segment is used for a single crossing.
+      --  A zero Segment marks an inactive slot; its other fields are ignored.
       First_Segment  : Natural := 0;
       Last_Segment   : Natural := 0;
       First_X        : Fixed_16 := Zero;
@@ -1001,10 +1002,8 @@ package body GFX.Rasteriser.DDA4 is
       Reversed     : Boolean;
       Coverage     : in out Cell_Coverage)
    is
-      Old_Top    : Segment_DDA := Side.Top_Segment;
-      Old_Bottom : Segment_DDA := Side.Bottom_Segment;
-
       procedure Keep (Part : Segment_DDA);
+
       procedure Continue_Portion (Part : in out Segment_DDA);
 
       procedure Keep (Part : Segment_DDA) is
@@ -1025,6 +1024,10 @@ package body GFX.Rasteriser.DDA4 is
          end if;
       end Keep;
 
+      ----------------------
+      -- Continue_Portion --
+      ----------------------
+
       procedure Continue_Portion (Part : in out Segment_DDA) is
       begin
          if Part.Segment = 0 then
@@ -1033,20 +1036,38 @@ package body GFX.Rasteriser.DDA4 is
 
          if Column_Upper < Max (Part.X_Top, Part.X_Bottom) then
             Step_Column (Part, Chain (Part.Segment).Step_Y);
+
          else
             --  No intersection beyond the endpoint is needed in this cell.
+
             Part.At_Column_Lower := Part.At_Column_Upper;
          end if;
 
          Accumulate_Portion (Part, Column_Upper, Reversed, Coverage);
-         Keep (Part);
+
+         if Column >= Part.Column_Last then
+            --  Geometry is no longer read after this portion is exhausted.
+
+            Part.Segment := 0;
+         end if;
       end Continue_Portion;
 
    begin
-      Side.Top_Segment := (others => <>);
-      Side.Bottom_Segment := (others => <>);
-      Continue_Portion (Old_Top);
-      Continue_Portion (Old_Bottom);
+      --  Advance active portions in place, preserving their chain order.
+      --  The common single-portion case needs no record copies or clearing.
+
+      Continue_Portion (Side.Top_Segment);
+      Continue_Portion (Side.Bottom_Segment);
+
+      if Side.Top_Segment.Segment = 0
+        and Side.Bottom_Segment.Segment /= 0
+      then
+         --  Keep a sole surviving portion in the top slot before activation
+         --  of pending portions, as required by Keep and Draw_Interior.
+
+         Side.Top_Segment := Side.Bottom_Segment;
+         Side.Bottom_Segment.Segment := 0;
+      end if;
 
       while Side.Next_Segment /= 0 and then Side.Next_Column = Column loop
          declare
