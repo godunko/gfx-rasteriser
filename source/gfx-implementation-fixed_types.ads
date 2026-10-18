@@ -93,14 +93,6 @@ is
 
    function "/" (Left : Fixed_16; Right : GX_Integer) return Fixed_16;
 
-   function Multiply_Saturated
-     (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
-
-   function Divide_Saturated
-     (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
-   --  Divide Left by Right, return GX_Integer'First/GX_Integer'Last on
-   --  overflow.
-
    function Is_Equal_Fixed_6
      (Left  : GFX.Rasteriser.Device_Pixel_Coordinate;
       Right : GFX.Rasteriser.Device_Pixel_Coordinate) return Boolean;
@@ -196,6 +188,23 @@ is
 
    function "/" (Left : Fixed_12; Right : GX_Integer) return Fixed_12;
 
+   function Divide_Saturated
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16
+     with
+       Pre => Left /= Zero or Right /= Zero,
+       --  The result of 0 / 0 is undefined; Constraint_Error is raised if
+       --  precondition checks are disabled.
+       Post =>
+         Ghost.Is_Truncated_Saturated_Quotient
+           (Left, Right, Divide_Saturated'Result);
+   --  Return the quotient, truncated toward zero and saturated on overflow.
+   --  Division by zero returns `Fixed_16'First` for a negative numerator and
+   --  `Fixed_16'Last` for a positive numerator. Zero divided by zero violates
+   --  the precondition; the body raises `Constraint_Error` if precondition
+   --  checks are disabled.
+   --
+   --  The implementation uses 64-bit integer arithmetic.
+
    function Floor (Item : Fixed_16) return Fixed_6;
 
    function Floor (Item : Fixed_16) return GX_Integer;
@@ -208,6 +217,29 @@ is
 
    function Min (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
    --  Return the smaller of Left and Right.
+
+   function Multiply_Saturated
+     (Left : Fixed_16; Right : Fixed_16) return Fixed_16
+     with Post =>
+       Ghost.Is_Truncated_Saturated_Product
+         (Left, Right, Multiply_Saturated'Result);
+   --  Return the product, truncated toward zero and saturated on overflow.
+   --
+   --  The implementation uses 64-bit integer arithmetic.
+
+   package Ghost with Ghost is
+
+      --  Predicates use widened integer arithmetic to specify truncation
+      --  toward zero followed by saturation to the `Fixed_16` range.
+
+      function Is_Truncated_Saturated_Product
+        (Left, Right, Result : Fixed_16) return Boolean;
+
+      function Is_Truncated_Saturated_Quotient
+        (Left, Right, Result : Fixed_16) return Boolean;
+      --  Return `False` for zero divided by zero: no normal result exists.
+
+   end Ghost;
 
 private
 

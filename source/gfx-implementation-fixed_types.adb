@@ -24,6 +24,51 @@ package body GFX.Implementation.Fixed_Types is
    function To_Fixed_16 is
      new Ada.Unchecked_Conversion (GX_Unsigned, Fixed_16);
 
+   -----------
+   -- Ghost --
+   -----------
+
+   package body Ghost is
+
+      ------------------
+      -- Is_Saturated --
+      ------------------
+
+      function Is_Saturated
+        (Value : GX_Integer_2; Result : Fixed_16) return Boolean is
+        (GX_Integer_2 (Result) = GX_Integer_2'Max
+           (GX_Integer_2 (Fixed_16_First), GX_Integer_2'Min
+              (GX_Integer_2 (Fixed_16_Last), Value)));
+
+      ------------------------------------
+      -- Is_Truncated_Saturated_Product --
+      ------------------------------------
+
+      function Is_Truncated_Saturated_Product
+        (Left, Right, Result : Fixed_16) return Boolean is
+        (Is_Saturated
+           ((GX_Integer_2 (Left) * GX_Integer_2 (Right)) / 2 ** 16,
+            Result));
+
+      -------------------------------------
+      -- Is_Truncated_Saturated_Quotient --
+      -------------------------------------
+
+      function Is_Truncated_Saturated_Quotient
+        (Left, Right, Result : Fixed_16) return Boolean is
+        (if Right = Zero then
+           (if Left < Zero then Result = Fixed_16_First
+            elsif Left > Zero then Result = Fixed_16_Last
+            else False)
+         else
+           Is_Saturated
+             ((GX_Integer_2 (Left) * 2 ** 16) / GX_Integer_2 (Right),
+              Result));
+      --  Integer division truncates toward zero. Widening before scaling
+      --  or multiplication keeps all intermediate values representable.
+
+   end Ghost;
+
    ---------
    -- "*" --
    ---------
@@ -117,6 +162,9 @@ package body GFX.Implementation.Fixed_Types is
       if Right = 0 then
          if Left < 0 then
             return Fixed_16 (GX_Integer'First);
+
+         elsif Left = 0 then
+            raise Constraint_Error with "saturated divide 0/0";
 
          else
             return Fixed_16 (GX_Integer'Last);
