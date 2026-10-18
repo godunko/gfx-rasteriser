@@ -244,6 +244,8 @@ package body GFX.Rasteriser.DDA4 is
             and then
               (if X_1 = Column_Upper and then X_2 = Column_Upper then
                  Self.Twice_Area = Self.Twice_Area'Old);
+   --  Accumulate the contribution of a directed segment contained in one
+   --  cell.
 
    procedure Integrate
      (Accumulator : in out Fixed_6;
@@ -266,7 +268,8 @@ package body GFX.Rasteriser.DDA4 is
 
    begin
       Self.Coverage   := @ + Delta_Y;
-      Self.Twice_Area := @ + Delta_Y * Floor (2 * Column_Upper - (X_1 + X_2));
+      Self.Twice_Area :=
+        @ + Delta_Y * Floor ((Column_Upper - X_1) + (Column_Upper - X_2));
    end Accumulate;
 
    ---------------------------
@@ -1060,7 +1063,8 @@ package body GFX.Rasteriser.DDA4 is
    -----------------------
 
    procedure Rasterize_Contour
-     (Left, Right : Vertex_Array;
+     (Left      : Vertex_Array;
+      Right     : Vertex_Array;
       Fill_Span : not null access procedure
         (X        : Device_Pixel_Index;
          Y        : Device_Pixel_Index;
