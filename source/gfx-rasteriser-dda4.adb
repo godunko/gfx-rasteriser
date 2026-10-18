@@ -55,6 +55,10 @@ package body GFX.Rasteriser.DDA4 is
             Chain (Index).Y < Chain (Index + 1).Y);
       --  Horizontal and zero-length segments have already been removed.
 
+      function Belongs_To_Pixel_Upper_Bound
+        (Value : Fixed_16; Upper : Fixed_16) return Boolean is
+         (Upper - One <= Value and Value < Upper);
+
    end Ghost;
 
    procedure Rasterize_Contour
@@ -80,7 +84,18 @@ package body GFX.Rasteriser.DDA4 is
    procedure Initialize_Row_Cursor
      (Chain     : Vertex_Array;
       Row_Upper : Fixed_16;
-      Cursor    : out Row_Cursor);
+      Cursor    : out Row_Cursor)
+     with
+       Pre =>
+         Chain'Length >= 2
+         --  At least one segment on the edge.
+         and Ghost.Has_Strictly_Increasing_Y (Chain)
+         --  Vertices in the chain are strictly ordered from top to bottom.
+         and Is_Upper_Bound (Row_Upper)
+         --  `Row_Upper` is a valid upper bound for the current row.
+         and Ghost.Belongs_To_Pixel_Upper_Bound
+               (Chain (Chain'First).Y, Row_Upper);
+
    --  Initialize once before the first row.
 
    Rendering_Area : GFX.Implementation.Clipping.GF_Clipping_Rectangle;
@@ -426,26 +441,21 @@ package body GFX.Rasteriser.DDA4 is
       Row_Upper : Fixed_16;
       Cursor    : out Row_Cursor)
    is
-      Index : constant Positive := Chain'First;
+      Index   : constant Positive := Chain'First;
+      Current : constant Vertex   := Chain (Index);
+      Next    : constant Vertex   := Chain (Index + 1);
 
    begin
-      Cursor := (others => <>);
-
-      Cursor.Segment := Index;
-      Cursor.X := Chain (Index).X;
-      Cursor.Y := Chain (Index).Y;
-
-      if Row_Upper < Chain (Index + 1).Y then
-         declare
-            DX : constant Fixed_16 := Chain (Index + 1).X - Cursor.X;
-            Offset : constant Fixed_16 :=
-              Multiply_Saturated
-                (Chain (Index).Step_X, Row_Upper - Cursor.Y);
-         begin
-            Cursor.At_Row_Upper := Cursor.X
-              + Max (Min (Zero, DX), Min (Max (Zero, DX), Offset));
-         end;
-      end if;
+      Cursor :=
+        (Segment      => Index,
+         X            => Current.X,
+         Y            => Current.Y,
+         At_Row_Upper =>
+           (if Row_Upper < Next.Y
+            then
+              Current.X
+                + Multiply_Scaled (Current.Step_X, Row_Upper - Current.Y)
+            else Zero));
    end Initialize_Row_Cursor;
 
    ----------------------------
