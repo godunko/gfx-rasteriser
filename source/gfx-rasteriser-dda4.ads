@@ -9,18 +9,14 @@
 --  fractional precision. No pixel buffer or dynamic allocation is needed.
 --
 --  The rasterizer uses a DDA (Digital Differential Analyzer) approach to
---  compute intersections of the line with the pixel grid, maintaining
---  high precision for subpixel coverage calculations. Error correction is
---  *not* applied when stepping along the dominant axis.
---  When stepping by a truncated `Fixed_16` increment without remainder
---  correction, accumulated minor-axis error is less than N / 65_536 pixels
---  after N one-pixel steps along the dominant axis. Beyond 1_024 steps it
---  can exceed one 1/64 subpixel. Smaller errors can also change coverage
---  near subpixel grid boundaries. The step count refers to the processed
---  dominant-axis extent. Inverting a quantized slope can further amplify
---  intersection errors on nearly horizontal edges. Endpoint coordinates
---  are used without stepping beyond an edge. Coverage arithmetic also
---  truncates to Fixed_16 precision.
+--  compute intersections of the line with the pixel grid. Intersections are
+--  exact: they are represented by values rounded toward negative infinity
+--  to `Fixed_16` precision together with remainders of this rounding, see
+--  `GFX.Implementation.Fixed_Types.Exact_DDA`, so no error is accumulated
+--  while stepping along the edge, and slopes are not quantized. Only the
+--  rounded values are used by coverage computations, so each intersection
+--  has an error less than 1 / 65_536 pixel. Coverage arithmetic truncates
+--  to 1/64 subpixel precision.
 
 with GFX.Points;
 

@@ -240,6 +240,12 @@ is
    --  range `[0.0, 1.0]`, the intermediate product fits in 64 bits, and the
    --  scaled result fits in `Fixed_16` without saturation.
 
+   pragma Inline (Floor);
+   pragma Inline (Integral);
+   pragma Inline (Multiply_Saturated);
+   pragma Inline (Multiply_Scaled);
+   pragma Inline (Pixel_Lower_Bound);
+
    package Ghost with Ghost is
 
       --  Predicates use widened integer arithmetic to specify truncation

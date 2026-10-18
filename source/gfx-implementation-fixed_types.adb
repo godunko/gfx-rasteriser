@@ -180,6 +180,25 @@ package body GFX.Implementation.Fixed_Types is
          end if;
       end if;
 
+      if ((To_Unsigned (Left) or To_Unsigned (Right)) and 16#3FF#) = 0
+        and GX_Integer (Left) in -(2 ** 25 - 1) .. 2 ** 25 - 1
+      then
+         --  Both operands are on the 1/64 subpixel grid (it is the case of
+         --  the snapped coordinates) and the dividend is less than 512
+         --  pixels. Scaling both operands down by 2 ** 10 gives the same
+         --  quotient, and the scaled dividend fits into GX_Integer, so the
+         --  native division can be used instead of the much slower 64-bit
+         --  one. The result is always in range.
+
+         declare
+            Dividend : constant GX_Integer := GX_Integer (Left) / 2 ** 10;
+            Divisor  : constant GX_Integer := GX_Integer (Right) / 2 ** 10;
+
+         begin
+            return Fixed_16 (GX_Integer'(Dividend * 2 ** 16 / Divisor));
+         end;
+      end if;
+
       D  := L / R;
 
       if D < GX_Integer_2 (GX_Integer'First) then
@@ -364,10 +383,21 @@ package body GFX.Implementation.Fixed_Types is
 
    function Snap_To_Subpixel
      (Item : GFX.Rasteriser.Device_Pixel_Coordinate) return Fixed_16 is
+      Scaled : constant GX_Real := Item * 64.0;
+      Value  : GX_Integer := GX_Integer (GX_Real'Truncation (Scaled));
+      --  Conversion of the truncated value is done by the single hardware
+      --  instruction, while GX_Real'Floor is implemented by the run-time
+      --  library.
+
    begin
-      return
-        Fixed_16
-          (GX_Integer (GX_Real'Floor (Item * 64.0)) * GX_Integer'(16#400#));
+      if GX_Real (Value) > Scaled then
+         --  Truncation rounds negative values toward zero; adjust to round
+         --  toward negative infinity.
+
+         Value := Value - 1;
+      end if;
+
+      return Fixed_16 (Value * GX_Integer'(16#400#));
    end Snap_To_Subpixel;
 
    ---------------------------

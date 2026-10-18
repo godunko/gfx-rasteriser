@@ -13,13 +13,14 @@
 pragma Ada_2022;
 
 with GFX.Implementation.Clipping;
-with GFX.Implementation.Fixed_Types;
+with GFX.Implementation.Fixed_Types.Exact_DDA;
 with GFX.Implementation.Subpixel_Operations;
 with GFX.Vectors;
 
 package body GFX.Rasteriser.DDA4 is
 
    use GFX.Implementation.Fixed_Types;
+   use GFX.Implementation.Fixed_Types.Exact_DDA;
    use GFX.Implementation.Subpixel_Operations;
 
    type Cell_Coverage is record
@@ -34,10 +35,10 @@ package body GFX.Rasteriser.DDA4 is
       Y      : Fixed_16;
       Column : GX_Integer;
       Row    : GX_Integer;
-      Step_X : Fixed_16 := Zero;
-      --  Inverse slope, ΔX / ΔY, step on X while Y changes by one pixel.
-      Step_Y : Fixed_16 := Zero;
-      --  Slope, ΔY / ΔX, step on Y while X changes by one pixel.
+      Row_Slope    : Slope;
+      --  Inverse slope of the segment to the next vertex, ΔX / ΔY: change
+      --  of X when Y changes, used to compute intersections with row
+      --  boundaries.
    end record;
 
    type Vertex_Array is array (Positive range <>) of Vertex;
@@ -45,23 +46,34 @@ package body GFX.Rasteriser.DDA4 is
    type Row_Cursor is record
       Segment      : Natural := 0;
       --  Zero means that the chain is exhausted.
-      X            : Fixed_16 := Zero;
+      X            : Coordinate;
       Y            : Fixed_16 := Zero;
       --  First unconsumed point, possibly inside the first row.
-      At_Row_Upper : Fixed_16 := Zero;
+      At_Row_Upper : Coordinate;
       --  Valid only when this segment extends below the current row.
+      Has_Column   : Boolean := False;
+      Column_Slope : Slope;
+      --  Slope of the segment, ΔY / ΔX, along increasing X: change of Y when
+      --  X increases, used to compute intersections with column boundaries.
+      --  It is computed when the first intersection is needed.
+      Column_Upper : Fixed_16 := Zero;
+      At_Column    : Coordinate;
+      --  Last computed intersection of this segment with a column boundary,
+      --  if any. It is kept between rows to compute intersections in the
+      --  next row by DDA steps.
    end record;
 
    type Segment_DDA is record
       Segment         : Natural := 0;
 
-      X_Top           : Fixed_16 := Zero;
+      X_Top           : Coordinate;
       Y_Top           : Fixed_16 := Zero;
-      X_Bottom        : Fixed_16 := Zero;
+      X_Bottom        : Coordinate;
       Y_Bottom        : Fixed_16 := Zero;
       --  Top and bottom endpoints of the segment portion within the current
       --  row. Each may be an original segment endpoint or an intersection
-      --  with a row boundary.
+      --  with a row boundary. X coordinates are exact, computed by the
+      --  segment's Row_Slope.
 
       Column_First    : GX_Integer := 0;
       Column_Last     : GX_Integer := -1;
@@ -134,29 +146,32 @@ package body GFX.Rasteriser.DDA4 is
    --  boundary, this is the column to its right.
 
    type Portion_State is record
-      Column_First : GX_Integer := 0;
-      Column_Last  : GX_Integer := -1;
+      Column_First : GX_Integer;
+      Column_Last  : GX_Integer;
       --  Inclusive range of cells crossed by the portion.
-      X_In         : Fixed_16 := Zero;
-      Y_In         : Fixed_16 := Zero;
+      X_In         : Fixed_16;
+      Y_In         : Fixed_16;
       --  Point where the portion enters the current cell: its left endpoint
       --  in the first cell, then the intersection with the cell's left
       --  boundary.
-      X_End        : Fixed_16 := Zero;
-      Y_End        : Fixed_16 := Zero;
+      X_End        : Fixed_16;
+      Y_End        : Fixed_16;
       --  Right endpoint of the portion.
-      Y_First_Out  : Fixed_16 := Zero;
-      --  Intersection with the right boundary of the first cell; valid only
-      --  when the portion spans several cells.
-      Step         : Fixed_16 := Zero;
-      Y_Lower      : Fixed_16 := Zero;
-      Y_Upper      : Fixed_16 := Zero;
-      --  DDA step and bounds of the portion along the Y axis.
-      Positive     : Boolean  := False;
+      Y_Next       : Coordinate;
+      --  Exact intersection with the right boundary of the current cell;
+      --  valid only when the portion spans several cells.
+      Slope        : Exact_DDA.Slope;
+      --  Slope of the segment along increasing X.
+      Y_Lower      : Fixed_16;
+      Y_Upper      : Fixed_16;
+      --  Bounds of the portion along the Y axis.
+      Positive     : Boolean;
       --  Whether the contour traverses the portion from left to right.
    end record;
    --  All state of the portion used while walking along the row. Objects of
    --  this type are local, so the compiler can allocate them to registers.
+   --  Components have no default values to avoid initialization overhead;
+   --  all of them are set by Initialize_Portion.
 
    type Portion_Array is array (Positive range <>) of Portion_State;
 
@@ -164,10 +179,13 @@ package body GFX.Rasteriser.DDA4 is
      (Chain    : Vertex_Array;
       Part     : Segment_DDA;
       Reversed : Boolean;
+      Cursor   : in out Row_Cursor;
       State    : out Portion_State)
-     with Inline_Always;
+     with Inline_Always,
+          Pre => Cursor.Segment = Part.Segment;
    --  Initialize State to walk Part from its first cell. Reversed traverses
-   --  the segment against chain order.
+   --  the segment against chain order. Cursor is the cursor of the chain
+   --  before it is advanced to the next segment or row.
 
    procedure Contribute
      (State        : in out Portion_State;
@@ -257,32 +275,6 @@ package body GFX.Rasteriser.DDA4 is
       return A = To_Fixed_16 (To_Pixel (A));
    end Is_Upper_Bound;
 
-   --------------------
-   -- Intersection_Y --
-   --------------------
-
-   function Intersection_Y
-     (Chain : Vertex_Array;
-      Part  : Segment_DDA;
-      X     : Fixed_16) return Fixed_16
-   is
-      Origin : constant Fixed_16 := Chain (Part.Segment).Y;
-      Offset : Fixed_16;
-   begin
-      if X = Part.X_Top then
-         return Part.Y_Top;
-      elsif X = Part.X_Bottom then
-         return Part.Y_Bottom;
-      end if;
-
-      Offset := Multiply_Saturated
-        (Chain (Part.Segment).Step_Y, X - Chain (Part.Segment).X);
-      return Origin + Max (Part.Y_Top - Origin,
-        Min (Part.Y_Bottom - Origin, Offset));
-   end Intersection_Y;
-
-   pragma Inline (Intersection_Y);
-
    ------------------------
    -- Initialize_Portion --
    ------------------------
@@ -291,41 +283,98 @@ package body GFX.Rasteriser.DDA4 is
      (Chain    : Vertex_Array;
       Part     : Segment_DDA;
       Reversed : Boolean;
+      Cursor   : in out Row_Cursor;
       State    : out Portion_State)
    is
-      Left_Is_Top : constant Boolean := Part.X_Top <= Part.X_Bottom;
+      Left_Is_Top : constant Boolean :=
+        Value (Part.X_Top) <= Value (Part.X_Bottom);
       --  For a vertical portion the top endpoint is used as the left one,
       --  so the sign still follows the traversal direction.
 
    begin
       State.Column_First := Part.Column_First;
       State.Column_Last  := Part.Column_Last;
-      State.Step         := Chain (Part.Segment).Step_Y;
       State.Y_Lower      := Part.Y_Top;
       State.Y_Upper      := Part.Y_Bottom;
       State.Positive     := Left_Is_Top xor Reversed;
-      State.Y_First_Out  := Zero;
 
       if Left_Is_Top then
-         State.X_In  := Part.X_Top;
+         State.X_In  := Value (Part.X_Top);
          State.Y_In  := Part.Y_Top;
-         State.X_End := Part.X_Bottom;
+         State.X_End := Value (Part.X_Bottom);
          State.Y_End := Part.Y_Bottom;
 
       else
-         State.X_In  := Part.X_Bottom;
+         State.X_In  := Value (Part.X_Bottom);
          State.Y_In  := Part.Y_Bottom;
-         State.X_End := Part.X_Top;
+         State.X_End := Value (Part.X_Top);
          State.Y_End := Part.Y_Top;
       end if;
 
       if Part.Column_First < Part.Column_Last then
-         --  Initialize the intersection from the original vertex. Later
-         --  cells use DDA steps.
+         declare
+            Upper : constant Fixed_16 :=
+              Pixel_Lower_Bound (Part.Column_First) + One;
 
-         State.Y_First_Out :=
-           Intersection_Y
-             (Chain, Part, Pixel_Lower_Bound (Part.Column_First) + One);
+         begin
+            if not Cursor.Has_Column then
+               declare
+                  DX : constant Fixed_16 :=
+                    Chain (Part.Segment + 1).X - Chain (Part.Segment).X;
+                  DY : constant Fixed_16 :=
+                    Chain (Part.Segment + 1).Y - Chain (Part.Segment).Y;
+
+               begin
+                  Cursor.Column_Slope :=
+                    (if DX >= Zero
+                     then To_Slope (DY, DX)
+                     else To_Slope (-DY, -DX));
+               end;
+
+               --  Compute the intersection with the right boundary of the
+               --  first cell exactly, from the left endpoint.
+
+               Cursor.At_Column :=
+                 Cross
+                   (Out_Origin => State.Y_In,
+                    In_Origin  =>
+                      (if Left_Is_Top then Part.X_Top else Part.X_Bottom),
+                    Through    => Cursor.Column_Slope,
+                    In_Value   => Upper);
+               Cursor.Column_Upper := Upper;
+               Cursor.Has_Column   := True;
+
+            else
+               --  Move the intersection computed in the previous row to the
+               --  right boundary of the first cell. It is exact, so there is
+               --  no difference with direct computation. Local copies allow
+               --  the compiler to keep values in registers.
+
+               declare
+                  Through : constant Slope := Cursor.Column_Slope;
+                  At_Edge : Coordinate     := Cursor.At_Column;
+                  Steps   : GX_Integer     :=
+                    To_Pixel (Upper) - To_Pixel (Cursor.Column_Upper);
+
+               begin
+                  while Steps > 0 loop
+                     Step (At_Edge, Through);
+                     Steps := Steps - 1;
+                  end loop;
+
+                  while Steps < 0 loop
+                     Step_Back (At_Edge, Through);
+                     Steps := Steps + 1;
+                  end loop;
+
+                  Cursor.At_Column    := At_Edge;
+                  Cursor.Column_Upper := Upper;
+               end;
+            end if;
+
+            State.Y_Next := Cursor.At_Column;
+            State.Slope  := Cursor.Column_Slope;
+         end;
       end if;
    end Initialize_Portion;
 
@@ -339,29 +388,50 @@ package body GFX.Rasteriser.DDA4 is
       Column_Upper : Fixed_16;
       Coverage     : in out Cell_Coverage)
    is
-      X_Out   : Fixed_16;
       Y_Out   : Fixed_16;
+      Width   : Fixed_6;
       Delta_Y : Fixed_6;
 
    begin
-      if Column = State.Column_Last then
-         X_Out := State.X_End;
-         Y_Out := State.Y_End;
-
-      elsif Column = State.Column_First then
-         X_Out := Column_Upper;
-         Y_Out := State.Y_First_Out;
-
-      else
-         X_Out := Column_Upper;
-         Y_Out := State.Y_In
-           + Max (State.Y_Lower - State.Y_In,
-                  Min (State.Y_Upper - State.Y_In, State.Step));
-      end if;
-
       --  Accumulate the height and twice the signed area of the trapezoid
       --  matching the right edge for the part of the portion inside the
-      --  cell, directed along the contour.
+      --  cell, directed along the contour. Width is the sum of distances
+      --  from both ends of the part to the right edge.
+
+      if Column = State.Column_Last then
+         --  The left end of the part is the left endpoint of the portion in
+         --  its first cell, and it is on the left edge of other cells.
+
+         Y_Out := State.Y_End;
+         Width :=
+           Floor
+             ((if Column = State.Column_First
+               then Column_Upper - State.X_In
+               else One)
+              + (Column_Upper - State.X_End));
+
+      elsif Column = State.Column_First then
+         --  Y_Next of the first cell is computed by Initialize_Portion.
+
+         Y_Out := Value (State.Y_Next);
+         Width := Floor (Column_Upper - State.X_In);
+
+      else
+         --  The part crosses the whole cell, the left end of the part is on
+         --  the left edge of the cell, and the right end is on the right
+         --  edge.
+
+         Step (State.Y_Next, State.Slope);
+         Y_Out := Value (State.Y_Next);
+         Width := One;
+      end if;
+
+      --  Column boundaries crossed by the portion are strictly inside of the
+      --  range of its X coordinates, so exact intersections with them are
+      --  strictly inside of the range of its Y coordinates, no clamping is
+      --  needed.
+
+      pragma Assert (State.Y_Lower <= Y_Out and Y_Out <= State.Y_Upper);
 
       Delta_Y := Floor (Y_Out) - Floor (State.Y_In);
 
@@ -370,11 +440,8 @@ package body GFX.Rasteriser.DDA4 is
       end if;
 
       Coverage.Coverage   := @ + Delta_Y;
-      Coverage.Twice_Area :=
-        @ + Delta_Y
-              * Floor ((Column_Upper - State.X_In) + (Column_Upper - X_Out));
+      Coverage.Twice_Area := @ + Delta_Y * Width;
 
-      State.X_In := X_Out;
       State.Y_In := Y_Out;
    end Contribute;
 
@@ -394,14 +461,17 @@ package body GFX.Rasteriser.DDA4 is
    begin
       Cursor :=
         (Segment      => Index,
-         X            => Current.X,
+         X            => To_Coordinate (Current.X),
          Y            => Current.Y,
          At_Row_Upper =>
            (if Row_Upper < Next.Y
             then
-              Current.X
-                + Multiply_Scaled (Current.Step_X, Row_Upper - Current.Y)
-            else Zero));
+              At_Offset (Current.X, Current.Row_Slope, Row_Upper - Current.Y)
+            else To_Coordinate (Zero)),
+         Has_Column   => False,
+         Column_Slope => <>,
+         Column_Upper => Zero,
+         At_Column    => To_Coordinate (Zero));
    end Initialize_Row_Cursor;
 
    ----------------------------
@@ -447,10 +517,10 @@ package body GFX.Rasteriser.DDA4 is
 
       Cursor.X := Part.X_Bottom;
       Cursor.Y := Row_Upper;
-      Cursor.At_Row_Upper :=
-        (if Row_Upper + One < Last.Y
-         then Cursor.X + Chain (Index).Step_X
-         else Zero);
+
+      if Row_Upper + One < Last.Y then
+         Step (Cursor.At_Row_Upper, Chain (Index).Row_Slope);
+      end if;
    end Prepare_Simple_Portion;
 
    ----------------------
@@ -470,16 +540,16 @@ package body GFX.Rasteriser.DDA4 is
         with Pre =>
           Cursor.Segment in Chain'First .. Chain'Last - 1
           --  Both endpoints of the current segment exist.
-          and then Cursor.X = Chain (Cursor.Segment).X
+          and then Value (Cursor.X) = Chain (Cursor.Segment).X
           --  The X displacement is measured from the first vertex.
           and then Cursor.Y = Chain (Cursor.Segment).Y
-          --  Step_X and the Y displacement use the same origin.
+          --  Row_Slope and the Y displacement use the same origin.
           and then Is_Upper_Bound (Upper_Bound)
           --  The intersection lies on an integral row boundary.
           and then
             Ghost.Belongs_To_Pixel_Upper_Bound (Cursor.Y, Upper_Bound)
           --  The positive Y displacement is at most one pixel, as required
-          --  by Multiply_Scaled.
+          --  by At_Offset.
           and then Upper_Bound < Chain (Cursor.Segment + 1).Y;
           --  The boundary is inside the segment; its final vertex is
           --  handled separately by the caller.
@@ -497,12 +567,12 @@ package body GFX.Rasteriser.DDA4 is
       begin
          --  The cursor is at the segment's first vertex, and Upper_Bound is
          --  inside the segment, at most one pixel below that vertex.
-         --  Truncation toward zero keeps the displacement within the segment
-         --  without clamping.
 
-         Cursor.At_Row_Upper := Cursor.X
-           + Multiply_Scaled
-               (Chain (Cursor.Segment).Step_X, Upper_Bound - Cursor.Y);
+         Cursor.At_Row_Upper :=
+           At_Offset
+             (Chain (Cursor.Segment).X,
+              Chain (Cursor.Segment).Row_Slope,
+              Upper_Bound - Cursor.Y);
       end Prepare_Intersection;
 
    begin
@@ -526,25 +596,24 @@ package body GFX.Rasteriser.DDA4 is
                   Part.Y_Bottom := Row_Upper;
 
                else
-                  Part.X_Bottom := Last.X;
+                  Part.X_Bottom := To_Coordinate (Last.X);
                   Part.Y_Bottom := Last.Y;
                end if;
 
                Set_Column_Range (Part);
 
                Count := Count + 1;
-               Initialize_Portion (Chain, Part, Reversed, Portions (Count));
+               Initialize_Portion
+                 (Chain, Part, Reversed, Cursor, Portions (Count));
 
                if Row_Upper < Last.Y then
                   Cursor.X := Part.X_Bottom;
                   Cursor.Y := Row_Upper;
 
                   if Row_Upper + One < Last.Y then
-                     --  Continue this segment by one DDA step. Truncation
-                     --  toward zero keeps X within the segment.
-                     Cursor.At_Row_Upper := Cursor.X + Chain (Index).Step_X;
-                  else
-                     Cursor.At_Row_Upper := Zero;
+                     --  Continue this segment by one DDA step.
+
+                     Step (Cursor.At_Row_Upper, Chain (Index).Row_Slope);
                   end if;
 
                   return;
@@ -555,8 +624,6 @@ package body GFX.Rasteriser.DDA4 is
                --  A newly selected segment starts in the next row.
                if Row_Upper + One < Last.Y then
                   Prepare_Intersection (Row_Upper + One);
-               else
-                  Cursor.At_Row_Upper := Zero;
                end if;
 
                return;
@@ -564,10 +631,11 @@ package body GFX.Rasteriser.DDA4 is
 
             --  Consume a finished segment exactly once.
             if Index + 1 = Chain'Last then
-               Cursor := (others => <>);
+               Cursor.Segment := 0;
             else
-               Cursor.Segment := Index + 1;
-               Cursor.X := Last.X;
+               Cursor.Segment    := Index + 1;
+               Cursor.Has_Column := False;
+               Cursor.X := To_Coordinate (Last.X);
                Cursor.Y := Last.Y;
 
                if Cursor.Y < Row_Upper
@@ -642,6 +710,9 @@ package body GFX.Rasteriser.DDA4 is
          Part        : Segment_DDA;
          Left_State  : Portion_State;
          Right_State : Portion_State;
+         Left_Right  : Boolean;
+         Right_Right : Boolean;
+         --  Whether portions move right.
          Current     : GX_Integer;
          Upper       : Fixed_16;
          Cell        : Cell_Coverage;
@@ -651,10 +722,14 @@ package body GFX.Rasteriser.DDA4 is
       begin
          Prepare_Simple_Portion
            (Left, Row_Lower, Row_Upper, Left_Cursor, Part);
-         Initialize_Portion (Left, Part, True, Left_State);
+         Initialize_Portion (Left, Part, True, Left_Cursor, Left_State);
+         Left_Right :=
+           Exact_DDA.Value (Part.X_Top) < Exact_DDA.Value (Part.X_Bottom);
          Prepare_Simple_Portion
            (Right, Row_Lower, Row_Upper, Right_Cursor, Part);
-         Initialize_Portion (Right, Part, False, Right_State);
+         Initialize_Portion (Right, Part, False, Right_Cursor, Right_State);
+         Right_Right :=
+           Exact_DDA.Value (Part.X_Top) < Exact_DDA.Value (Part.X_Bottom);
          pragma Assert
            (Left_State.Column_First <= Right_State.Column_First);
 
@@ -692,6 +767,27 @@ package body GFX.Rasteriser.DDA4 is
                Upper   := @ + One;
             end if;
          end loop;
+
+         --  Intersections of a portion moving right continue in the next
+         --  row from the last one of this row, which is at the left boundary
+         --  of its last cell. Save it to avoid repeated DDA steps.
+
+         if Left_Right
+           and Left_State.Column_First < Left_State.Column_Last
+           and Left_State.Column_Last <= Right_State.Column_Last
+         then
+            Left_Cursor.At_Column    := Left_State.Y_Next;
+            Left_Cursor.Column_Upper :=
+              Pixel_Lower_Bound (Left_State.Column_Last);
+         end if;
+
+         if Right_Right
+           and Right_State.Column_First < Right_State.Column_Last
+         then
+            Right_Cursor.At_Column    := Right_State.Y_Next;
+            Right_Cursor.Column_Upper :=
+              Pixel_Lower_Bound (Right_State.Column_Last);
+         end if;
       end Draw_Simple_Row;
 
       ----------------------
@@ -857,12 +953,14 @@ package body GFX.Rasteriser.DDA4 is
             Y      => Y,
             Column => To_Pixel (X),
             Row    => To_Pixel (Y),
-            Step_X => <>,
-            Step_Y => <>);
+            Row_Slope    => <>);
          pragma Warnings (On);
 
       begin
-         if Left_Last = 0 or else Left_Vertex (Left_Last) /= Item then
+         if Left_Last = 0
+           or else Left_Vertex (Left_Last).X /= Item.X
+           or else Left_Vertex (Left_Last).Y /= Item.Y
+         then
             Left_Last := @ + 1;
             Left_Vertex (Left_Last) := Item;
          end if;
@@ -882,12 +980,14 @@ package body GFX.Rasteriser.DDA4 is
             Y      => Snap_To_Subpixel (Point.Y),
             Column => To_Pixel (X),
             Row    => To_Pixel (Y),
-            Step_X => <>,
-            Step_Y => <>);
+            Row_Slope    => <>);
          pragma Warnings (On);
 
       begin
-         if Right_Last = 0 or else Right_Vertex (Right_Last) /= Item then
+         if Right_Last = 0
+           or else Right_Vertex (Right_Last).X /= Item.X
+           or else Right_Vertex (Right_Last).Y /= Item.Y
+         then
             Right_Last := @ + 1;
             Right_Vertex (Right_Last) := Item;
          end if;
@@ -1236,26 +1336,24 @@ package body GFX.Rasteriser.DDA4 is
       for J in Left_First .. Left_Last - 1 loop
          declare
             DX : constant Fixed_16 :=
-              Left_Vertex (J).X - Left_Vertex (J + 1).X;
+              Left_Vertex (J + 1).X - Left_Vertex (J).X;
             DY : constant Fixed_16 :=
-              Left_Vertex (J).Y - Left_Vertex (J + 1).Y;
+              Left_Vertex (J + 1).Y - Left_Vertex (J).Y;
 
          begin
-            Left_Vertex (J).Step_X := Divide_Saturated (DX, DY);
-            Left_Vertex (J).Step_Y := Divide_Saturated (DY, DX);
+            Left_Vertex (J).Row_Slope := To_Slope (DX, DY);
          end;
       end loop;
 
       for J in Right_First .. Right_Last - 1 loop
          declare
             DX : constant Fixed_16 :=
-              Right_Vertex (J).X - Right_Vertex (J + 1).X;
+              Right_Vertex (J + 1).X - Right_Vertex (J).X;
             DY : constant Fixed_16 :=
-              Right_Vertex (J).Y - Right_Vertex (J + 1).Y;
+              Right_Vertex (J + 1).Y - Right_Vertex (J).Y;
 
          begin
-            Right_Vertex (J).Step_X := Divide_Saturated (DX, DY);
-            Right_Vertex (J).Step_Y := Divide_Saturated (DY, DX);
+            Right_Vertex (J).Row_Slope := To_Slope (DX, DY);
          end;
       end loop;
 
@@ -1274,8 +1372,10 @@ package body GFX.Rasteriser.DDA4 is
    ----------------------
 
    procedure Set_Column_Range (Part : in out Segment_DDA) is
-      X_Min : constant Fixed_16 := Min (Part.X_Top, Part.X_Bottom);
-      X_Max : constant Fixed_16 := Max (Part.X_Top, Part.X_Bottom);
+      X_Min : constant Fixed_16 :=
+        Min (Value (Part.X_Top), Value (Part.X_Bottom));
+      X_Max : constant Fixed_16 :=
+        Max (Value (Part.X_Top), Value (Part.X_Bottom));
 
    begin
       Part.Column_First := To_Pixel (X_Min);
