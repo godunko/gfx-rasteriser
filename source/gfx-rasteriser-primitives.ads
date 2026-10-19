@@ -12,7 +12,7 @@
 --  compute intersections of the line with the pixel grid. Intersections are
 --  exact: they are represented by values rounded toward negative infinity
 --  to `Fixed_16` precision together with remainders of this rounding, see
---  `GFX.Implementation.Fixed_Types.Exact_DDA`, so no error is accumulated
+--  `GFX.Implementation.DDA_Operations`, so no error is accumulated
 --  while stepping along the edge, and slopes are not quantized. Only the
 --  rounded values are used by coverage computations, so each intersection
 --  has an error less than 1 / 65_536 pixel. Coverage arithmetic truncates

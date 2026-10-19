@@ -13,14 +13,15 @@
 pragma Ada_2022;
 
 with GFX.Implementation.Clipping;
-with GFX.Implementation.Fixed_Types.Exact_DDA;
+with GFX.Implementation.DDA_Operations;
+with GFX.Implementation.Fixed_Types;
 with GFX.Implementation.Subpixel_Operations;
 with GFX.Vectors;
 
 package body GFX.Rasteriser.DDA5 is
 
    use GFX.Implementation.Fixed_Types;
-   use GFX.Implementation.Fixed_Types.Exact_DDA;
+   use GFX.Implementation.DDA_Operations;
    use GFX.Implementation.Subpixel_Operations;
 
    type Vertex is record

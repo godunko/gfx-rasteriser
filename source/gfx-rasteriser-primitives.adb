@@ -14,14 +14,15 @@ pragma Ada_2022;
 pragma Restrictions (No_Elaboration_Code);
 
 with GFX.Implementation.Clipping;
-with GFX.Implementation.Fixed_Types.Exact_DDA;
+with GFX.Implementation.DDA_Operations;
+with GFX.Implementation.Fixed_Types;
 with GFX.Implementation.Subpixel_Operations;
 with GFX.Vectors;
 
 package body GFX.Rasteriser.Primitives is
 
+   use GFX.Implementation.DDA_Operations;
    use GFX.Implementation.Fixed_Types;
-   use GFX.Implementation.Fixed_Types.Exact_DDA;
    use GFX.Implementation.Subpixel_Operations;
 
    type Cell_Coverage is record
@@ -154,7 +155,7 @@ package body GFX.Rasteriser.Primitives is
       Y_Next       : Coordinate;
       --  Exact intersection with the right boundary of the current cell;
       --  valid only when the portion spans several cells.
-      Slope        : Exact_DDA.Slope;
+      Slope        : GFX.Implementation.DDA_Operations.Slope;
       --  Slope of the segment along increasing X.
       Y_Lower      : Fixed_16;
       Y_Upper      : Fixed_16;
@@ -723,7 +724,7 @@ package body GFX.Rasteriser.Primitives is
          Current     : GX_Integer;
          Upper       : Fixed_16;
          Cell        : Cell_Coverage;
-         Value       : Grayscale;
+         Alpha       : Grayscale;
          Y           : constant GX_Integer := Row;
 
       begin
@@ -738,7 +739,7 @@ package body GFX.Rasteriser.Primitives is
             True,
             Left_Cursor,
             Left_State);
-         Left_Right := Exact_DDA.Value (X_Top) < Exact_DDA.Value (X_Bottom);
+         Left_Right := Value (X_Top) < Value (X_Bottom);
          Advance_Simple_Cursor (Left, Row_Lower, Row_Upper, Left_Cursor);
 
          X_Top    := Right_Cursor.X;
@@ -752,7 +753,7 @@ package body GFX.Rasteriser.Primitives is
             False,
             Right_Cursor,
             Right_State);
-         Right_Right := Exact_DDA.Value (X_Top) < Exact_DDA.Value (X_Bottom);
+         Right_Right := Value (X_Top) < Value (X_Bottom);
          Advance_Simple_Cursor (Right, Row_Lower, Row_Upper, Right_Cursor);
          pragma Assert
            (Left_State.Column_First <= Right_State.Column_First);
@@ -781,10 +782,10 @@ package body GFX.Rasteriser.Primitives is
                   Contribute (Right_State, Current, Upper, Cell);
                end if;
 
-               Integrate (Accumulator, Cell, Value);
+               Integrate (Accumulator, Cell, Alpha);
 
-               if Value /= 0 then
-                  Fill_Span (Current, Y, 1, Value);
+               if Alpha /= 0 then
+                  Fill_Span (Current, Y, 1, Alpha);
                end if;
 
                Current := @ + 1;

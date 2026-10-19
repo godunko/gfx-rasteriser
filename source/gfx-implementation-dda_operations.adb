@@ -8,8 +8,9 @@ pragma Restrictions (No_Elaboration_Code);
 
 with GFX.Implementation.Subpixel_Operations;
 
-package body GFX.Implementation.Fixed_Types.Exact_DDA is
+package body GFX.Implementation.DDA_Operations is
 
+   use GFX.Implementation.Fixed_Types;
    use GFX.Implementation.Subpixel_Operations;
 
    ---------------
@@ -92,7 +93,7 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
             Self.Remainder);
 
       else
-         Self.Lift      := 0;
+         Self.Lift      := Zero;
          Self.Remainder := 0;
       end if;
    end Initialize;
@@ -107,7 +108,7 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       Self.Error := Self.Error + Through.Remainder;
 
       if Self.Error >= Through.Denominator then
-         Self.Value := Self.Value + 1;
+         Self.Value := Self.Value + Fixed_16_Delta_Fixed;
          Self.Error := Self.Error - Through.Denominator;
       end if;
    end Step;
@@ -122,9 +123,9 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       Self.Error := Self.Error - Through.Remainder;
 
       if Self.Error < 0 then
-         Self.Value := Self.Value - 1;
+         Self.Value := Self.Value - Fixed_16_Delta_Fixed;
          Self.Error := Self.Error + Through.Denominator;
       end if;
    end Step_Back;
 
-end GFX.Implementation.Fixed_Types.Exact_DDA;
+end GFX.Implementation.DDA_Operations;

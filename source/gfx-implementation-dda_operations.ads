@@ -18,9 +18,13 @@
 
 pragma Restrictions (No_Elaboration_Code);
 
-package GFX.Implementation.Fixed_Types.Exact_DDA
+with GFX.Implementation.Fixed_Types;
+
+package GFX.Implementation.DDA_Operations
   with Pure
 is
+
+   use type GFX.Implementation.Fixed_Types.Fixed_16;
 
    type Slope is private;
    --  Exact slope Delta_Out / Delta_In. Objects are not initialized by
@@ -33,27 +37,30 @@ is
 
    procedure Initialize
      (Self      : out Slope;
-      Delta_Out : Fixed_16;
-      Delta_In  : Fixed_16)
-     with Pre => Delta_In >= Zero;
+      Delta_Out : GFX.Implementation.Fixed_Types.Fixed_16;
+      Delta_In  : GFX.Implementation.Fixed_Types.Fixed_16)
+     with Pre => Delta_In >= GFX.Implementation.Fixed_Types.Zero;
    --  Both deltas must be on the 1/64 subpixel grid. When Delta_In is zero
    --  the slope can't be used to compute coordinates; when it is less than
    --  one pixel, Step and Step_Back can't be used.
 
-   function To_Coordinate (Value : Fixed_16) return Coordinate
+   function To_Coordinate (Value : GFX.Implementation.Fixed_Types.Fixed_16) return Coordinate
      with Inline;
    --  Return coordinate of the given exact value.
 
-   function Value (Self : Coordinate) return Fixed_16
+   function Value (Self : Coordinate) return GFX.Implementation.Fixed_Types.Fixed_16
      with Inline;
    --  Return value rounded toward negative infinity.
 
    procedure At_Offset
      (Self    : out Coordinate;
-      Origin  : Fixed_16;
+      Origin  : GFX.Implementation.Fixed_Types.Fixed_16;
       Through : Slope;
-      Offset  : Fixed_16)
-     with Pre => Offset >= Zero and Offset <= One;
+      Offset  : GFX.Implementation.Fixed_Types.Fixed_16)
+   with
+     Pre =>
+       GFX.Implementation.Fixed_Types.Zero <= Offset
+       and Offset <= GFX.Implementation.Fixed_Types.One;
    --  Set Self to Origin + Offset * Delta_Out / Delta_In: the "out"
    --  coordinate of the point at Offset along the "in" axis from the point
    --  with exact "out" coordinate Origin. Offset must be on the 1/64
@@ -71,12 +78,14 @@ is
 
    procedure Cross
      (Self       : out Coordinate;
-      Out_Origin : Fixed_16;
+      Out_Origin : GFX.Implementation.Fixed_Types.Fixed_16;
       In_Origin  : Coordinate;
       Through    : Slope;
-      In_Value   : Fixed_16)
-     with Pre => In_Value - Value (In_Origin) >= Zero
-                   and In_Value - Value (In_Origin) <= One;
+      In_Value   : GFX.Implementation.Fixed_Types.Fixed_16)
+   with
+     Pre =>
+       In_Value - Value (In_Origin) >= GFX.Implementation.Fixed_Types.Zero
+       and In_Value - Value (In_Origin) <= GFX.Implementation.Fixed_Types.One;
    --  Set Self to the "out" coordinate of the point with the given exact
    --  "in" coordinate, on the line through the point (In_Origin,
    --  Out_Origin).
@@ -93,22 +102,25 @@ private
       Delta_Out   : GX_Integer;
       Denominator : GX_Integer;
       --  Deltas in 1/64 subpixel units; Denominator is Delta_In.
-      Lift        : Fixed_16;
+      Lift        : GFX.Implementation.Fixed_Types.Fixed_16;
       Remainder   : GX_Integer;
       --  Change of the coordinate when the "in" coordinate changes by one
       --  pixel: Lift + Remainder / Denominator.
    end record;
 
    type Coordinate is record
-      Value : Fixed_16;
+      Value : GFX.Implementation.Fixed_Types.Fixed_16;
       Error : GX_Integer;
       --  Exact value is Value + Error / Denominator, Error is in
       --  0 .. Denominator - 1.
    end record;
 
-   function To_Coordinate (Value : Fixed_16) return Coordinate is
-     ((Value => Value, Error => 0));
+   function To_Coordinate
+     (Value : GFX.Implementation.Fixed_Types.Fixed_16) return Coordinate
+   is ((Value => Value, Error => 0));
 
-   function Value (Self : Coordinate) return Fixed_16 is (Self.Value);
+   function Value
+     (Self : Coordinate) return GFX.Implementation.Fixed_Types.Fixed_16
+   is (Self.Value);
 
-end GFX.Implementation.Fixed_Types.Exact_DDA;
+end GFX.Implementation.DDA_Operations;
