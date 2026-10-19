@@ -289,6 +289,73 @@ package body GFX.Implementation.Fixed_Types is
           (LH * RH * 2**16 + LH * RL + LL * RH + (LL * RL) / 2**16);
    end Multiply_Coverage;
 
+   ---------------------------
+   -- Multiply_Divide_Floor --
+   ---------------------------
+
+   procedure Multiply_Divide_Floor
+     (Left        : Fixed_16;
+      Numerator   : GX_Integer;
+      Correction  : GX_Integer;
+      Denominator : GX_Integer;
+      Quotient    : out Fixed_16;
+      Remainder   : out GX_Integer)
+   is
+      Small_Numerator : constant := 2 ** 15;
+      --  With abs Left <= 1.0 and abs Correction <= abs Numerator, numerators
+      --  less than this value allow to use native 32-bit arithmetic.
+
+      Q : GX_Integer;
+
+   begin
+      if abs Numerator < Small_Numerator then
+         --  The dividend fits into GX_Integer. Native arithmetic is much
+         --  faster than 64-bit one on 32-bit CPUs.
+
+         declare
+            Dividend : constant GX_Integer :=
+              GX_Integer (Left) * Numerator + Correction;
+
+         begin
+            Q         := Dividend / Denominator;
+            Remainder := Dividend rem Denominator;
+         end;
+
+      else
+         declare
+            Dividend : constant GX_Integer_2 :=
+              GX_Integer_2 (Left) * GX_Integer_2 (Numerator)
+                + GX_Integer_2 (Correction);
+            Q_2      : constant GX_Integer_2 :=
+              Dividend / GX_Integer_2 (Denominator);
+
+         begin
+            if Q_2 not in GX_Integer_2 (GX_Integer'First + 1)
+                            .. GX_Integer_2 (GX_Integer'Last)
+            then
+               Quotient  :=
+                 (if Q_2 < 0
+                  then Fixed_16 (GX_Integer'First + 1)
+                  else Fixed_16 (GX_Integer'Last));
+               Remainder := 0;
+
+               return;
+            end if;
+
+            Q         := GX_Integer (Q_2);
+            Remainder :=
+              GX_Integer (Dividend - Q_2 * GX_Integer_2 (Denominator));
+         end;
+      end if;
+
+      if Remainder < 0 then
+         Q         := Q - 1;
+         Remainder := Remainder + Denominator;
+      end if;
+
+      Quotient := Fixed_16 (Q);
+   end Multiply_Divide_Floor;
+
    ------------------------
    -- Multiply_Saturated --
    ------------------------

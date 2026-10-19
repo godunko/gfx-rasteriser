@@ -224,6 +224,29 @@ is
    function Min (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
    --  Return the smaller of Left and Right.
 
+   procedure Multiply_Divide_Floor
+     (Left        : Fixed_16;
+      Numerator   : GX_Integer;
+      Correction  : GX_Integer;
+      Denominator : GX_Integer;
+      Quotient    : out Fixed_16;
+      Remainder   : out GX_Integer)
+     with
+       Inline,
+       Pre  =>
+         Ghost.Is_In_Range (Left, Zero, One)
+           and abs Correction <= abs Numerator
+           and Denominator > 0,
+       Post => Remainder in 0 .. Denominator - 1;
+   --  Divide `Left * Numerator + Correction` by `Denominator`, rounding
+   --  toward negative infinity. `Correction` and `Remainder` are in units
+   --  of `1 / Denominator` of the `Fixed_16` delta, so the exact result is
+   --  `Quotient + Remainder / Denominator` of the delta. `Quotient`
+   --  saturates on overflow, `Remainder` is zero in this case.
+   --
+   --  The implementation uses native integer arithmetic when
+   --  `abs Numerator < 2 ** 15`, and 64-bit integer arithmetic otherwise.
+
    function Multiply_Saturated
      (Left : Fixed_16; Right : Fixed_16) return Fixed_16
      with Post =>

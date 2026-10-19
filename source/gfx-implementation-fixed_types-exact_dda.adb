@@ -12,28 +12,6 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
 
    use GFX.Implementation.Subpixel_Operations;
 
-   Pixel_Scale : constant := 2 ** 16;
-   --  Scale of pixel in Fixed_16 units.
-
-   Small_Delta : constant := 2 ** 15;
-   --  Deltas less than this value in subpixel units (512 pixels) allow to
-   --  use native 32-bit arithmetic, see Divide.
-
-   procedure Divide
-     (Factor      : GX_Integer;
-      Delta_Out   : GX_Integer;
-      Correction  : GX_Integer;
-      Denominator : GX_Integer;
-      Quotient    : out GX_Integer;
-      Remainder   : out GX_Integer)
-     with Inline,
-          Pre => Factor in 0 .. Pixel_Scale
-                   and abs Correction < Small_Delta
-                   and Denominator > 0;
-   --  Divide Factor * Delta_Out + Correction by Denominator rounding toward
-   --  negative infinity, so Remainder is in 0 .. Denominator - 1. Quotient
-   --  saturates on overflow, Remainder is zero in this case.
-
    ---------------
    -- At_Offset --
    ---------------
@@ -44,17 +22,17 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       Through : Slope;
       Offset  : Fixed_16)
    is
-      Quotient : GX_Integer;
+      Quotient : Fixed_16;
 
    begin
-      Divide
-        (GX_Integer (Offset),
+      Multiply_Divide_Floor
+        (Offset,
          Through.Delta_Out,
          0,
          Through.Denominator,
          Quotient,
          Self.Error);
-      Self.Value := Origin + Fixed_16 (Quotient);
+      Self.Value := Origin + Quotient;
    end At_Offset;
 
    -----------
@@ -74,11 +52,11 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       --  (In_Value - In_Origin.Value) * Delta_Out
       --    - In_Origin.Error * sign (Delta_Out).
 
-      Quotient : GX_Integer;
+      Quotient : Fixed_16;
 
    begin
-      Divide
-        (GX_Integer (In_Value - In_Origin.Value),
+      Multiply_Divide_Floor
+        (In_Value - In_Origin.Value,
          Through.Delta_Out,
          (if Through.Delta_Out < 0
           then In_Origin.Error
@@ -86,64 +64,8 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
          Through.Denominator,
          Quotient,
          Self.Error);
-      Self.Value := Out_Origin + Fixed_16 (Quotient);
+      Self.Value := Out_Origin + Quotient;
    end Cross;
-
-   ------------
-   -- Divide --
-   ------------
-
-   procedure Divide
-     (Factor      : GX_Integer;
-      Delta_Out   : GX_Integer;
-      Correction  : GX_Integer;
-      Denominator : GX_Integer;
-      Quotient    : out GX_Integer;
-      Remainder   : out GX_Integer) is
-   begin
-      if abs Delta_Out < Small_Delta then
-         --  The numerator fits into GX_Integer. Native arithmetic is much
-         --  faster than 64-bit one on 32-bit CPUs.
-
-         declare
-            Numerator : constant GX_Integer :=
-              Factor * Delta_Out + Correction;
-
-         begin
-            Quotient  := Numerator / Denominator;
-            Remainder := Numerator rem Denominator;
-         end;
-
-      else
-         declare
-            Numerator : constant GX_Integer_2 :=
-              GX_Integer_2 (Factor) * GX_Integer_2 (Delta_Out)
-                + GX_Integer_2 (Correction);
-            Q         : constant GX_Integer_2 :=
-              Numerator / GX_Integer_2 (Denominator);
-
-         begin
-            if Q not in GX_Integer_2 (GX_Integer'First + 1)
-                          .. GX_Integer_2 (GX_Integer'Last)
-            then
-               Quotient  :=
-                 (if Q < 0 then GX_Integer'First + 1 else GX_Integer'Last);
-               Remainder := 0;
-
-               return;
-            end if;
-
-            Quotient  := GX_Integer (Q);
-            Remainder :=
-              GX_Integer (Numerator - Q * GX_Integer_2 (Denominator));
-         end;
-      end if;
-
-      if Remainder < 0 then
-         Quotient  := Quotient - 1;
-         Remainder := Remainder + Denominator;
-      end if;
-   end Divide;
 
    ----------------
    -- Initialize --
@@ -154,8 +76,6 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       Delta_Out : Fixed_16;
       Delta_In  : Fixed_16)
    is
-      Lift : GX_Integer;
-
    begin
       Self.Delta_Out   := To_Subpixel (Delta_Out);
       Self.Denominator := To_Subpixel (Delta_In);
@@ -163,14 +83,13 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       if Self.Denominator >= To_Subpixel (One) then
          --  Step is used only when Delta_In is at least one pixel.
 
-         Divide
-           (Pixel_Scale,
+         Multiply_Divide_Floor
+           (One,
             Self.Delta_Out,
             0,
             Self.Denominator,
-            Lift,
+            Self.Lift,
             Self.Remainder);
-         Self.Lift := Fixed_16 (Lift);
 
       else
          Self.Lift      := 0;
