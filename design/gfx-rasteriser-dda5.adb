@@ -153,15 +153,6 @@ package body GFX.Rasteriser.DDA5 is
    --  Check whether A lies on an exclusive upper pixel boundary.
    --  Every integral coordinate is the upper boundary of the previous pixel.
 
-   procedure Integrate
-     (Accumulator : in out Fixed_6;
-      Coverage    : Cell;
-      Alpha       : out Grayscale)
-     with Inline_Always;
-   --  Compute coverage of the cell from the accumulated height of edges to
-   --  the left of the cell and contribution of edges inside of it, and add
-   --  this contribution to Accumulator.
-
    -----------------------
    -- Initialize_Slopes --
    -----------------------
@@ -208,23 +199,6 @@ package body GFX.Rasteriser.DDA5 is
             Row_Upper - Current.Y);
       end if;
    end Initialize_Row_Cursor;
-
-   ---------------
-   -- Integrate --
-   ---------------
-
-   procedure Integrate
-     (Accumulator : in out Fixed_6;
-      Coverage    : Cell;
-      Alpha       : out Grayscale)
-   is
-      Area : constant Fixed_12 :=
-        (2 * Accumulator * One + Coverage.Twice_Area) / 2;
-
-   begin
-      Alpha       := Grayscale (Integral (255 * abs Area));
-      Accumulator := @ + Coverage.Coverage;
-   end Integrate;
 
    --------------------
    -- Is_Upper_Bound --
@@ -1017,8 +991,7 @@ package body GFX.Rasteriser.DDA5 is
          Height := Zero - Height;
       end if;
 
-      Item.Coverage   := @ + Height;
-      Item.Twice_Area := @ + Height * Width;
+      Add (Item, Height, Width);
    end Add_Part;
 
    ----------------

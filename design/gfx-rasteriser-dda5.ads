@@ -25,7 +25,7 @@
 
 with GFX.Points;
 
-private with GFX.Implementation.Fixed_Types;
+private with GFX.Rasteriser.Coverage;
 
 package GFX.Rasteriser.DDA5
   with Preelaborate
@@ -63,13 +63,6 @@ is
 
 private
 
-   type Cell is record
-      Coverage   : GFX.Implementation.Fixed_Types.Fixed_6 :=
-        GFX.Implementation.Fixed_Types.Zero;
-      --  Vertical height of edges inside the cell.
-      Twice_Area : GFX.Implementation.Fixed_Types.Fixed_12 :=
-        GFX.Implementation.Fixed_Types.Zero;
-      --  Twice the signed area of trapezoids matching the right edge.
-   end record;
+   type Cell is new GFX.Rasteriser.Coverage.Cell;
 
 end GFX.Rasteriser.DDA5;

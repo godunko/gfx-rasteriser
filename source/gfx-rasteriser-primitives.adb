@@ -17,6 +17,7 @@ with GFX.Implementation.Clipping;
 with GFX.Implementation.DDA_Operations;
 with GFX.Implementation.Fixed_Types;
 with GFX.Implementation.Subpixel_Operations;
+with GFX.Rasteriser.Coverage;
 with GFX.Vectors;
 
 package body GFX.Rasteriser.Primitives is
@@ -24,13 +25,7 @@ package body GFX.Rasteriser.Primitives is
    use GFX.Implementation.DDA_Operations;
    use GFX.Implementation.Fixed_Types;
    use GFX.Implementation.Subpixel_Operations;
-
-   type Cell_Coverage is record
-      Coverage   : Fixed_6;
-      --  Vertical height of the line inside the cell.
-      Twice_Area : Fixed_12;
-      --  Twice the signed area of the trapezoid matching the right edge.
-   end record;
+   use GFX.Rasteriser.Coverage;
 
    type Vertex is record
       X            : Fixed_16;
@@ -193,7 +188,7 @@ package body GFX.Rasteriser.Primitives is
      (State        : in out Portion_State;
       Column       : GX_Integer;
       Column_Upper : Fixed_16;
-      Coverage     : in out Cell_Coverage)
+      Coverage     : in out Cell)
      with Inline_Always,
           Pre => Column in State.Column_First .. State.Column_Last;
    --  Add the contribution of the portion to the cell Column and advance
@@ -239,28 +234,6 @@ package body GFX.Rasteriser.Primitives is
    function Is_Upper_Bound (A : Fixed_16) return Boolean;
    --  Check whether A lies on an exclusive upper pixel boundary.
    --  Every integral coordinate is the upper boundary of the previous pixel.
-
-   procedure Integrate
-     (Accumulator : in out Fixed_6;
-      Coverage    : Cell_Coverage;
-      Alpha       : out Grayscale) with Export;
-
-   ---------------
-   -- Integrate --
-   ---------------
-
-   procedure Integrate
-     (Accumulator : in out Fixed_6;
-      Coverage    : Cell_Coverage;
-      Alpha       : out Grayscale)
-   is
-      Area : constant Fixed_12 :=
-        (2 * Accumulator * One + Coverage.Twice_Area) / 2;
-
-   begin
-      Alpha       := Grayscale (Integral (255 * abs Area));
-      Accumulator := @ + Coverage.Coverage;
-   end Integrate;
 
    --------------------
    -- Is_Upper_Bound --
@@ -397,7 +370,7 @@ package body GFX.Rasteriser.Primitives is
      (State        : in out Portion_State;
       Column       : GX_Integer;
       Column_Upper : Fixed_16;
-      Coverage     : in out Cell_Coverage)
+      Coverage     : in out Cell)
    is
       Y_Out   : Fixed_16;
       Width   : Fixed_6;
@@ -450,8 +423,7 @@ package body GFX.Rasteriser.Primitives is
          Delta_Y := Zero - Delta_Y;
       end if;
 
-      Coverage.Coverage   := @ + Delta_Y;
-      Coverage.Twice_Area := @ + Delta_Y * Width;
+      Add (Coverage, Delta_Y, Width);
 
       State.Y_In := Y_Out;
    end Contribute;
@@ -723,7 +695,7 @@ package body GFX.Rasteriser.Primitives is
          --  Endpoints of the portion of the current side.
          Current     : GX_Integer;
          Upper       : Fixed_16;
-         Cell        : Cell_Coverage;
+         Cell        : Coverage.Cell;
          Alpha       : Grayscale;
          Y           : constant GX_Integer := Row;
 
@@ -825,7 +797,7 @@ package body GFX.Rasteriser.Primitives is
          Current  : GX_Integer;
          Last     : GX_Integer := GX_Integer'First;
          Upper    : Fixed_16;
-         Cell     : Cell_Coverage;
+         Cell     : Coverage.Cell;
          Value    : Grayscale;
          Active   : Boolean;
          Next     : GX_Integer;
