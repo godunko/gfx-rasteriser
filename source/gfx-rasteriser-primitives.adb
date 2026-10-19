@@ -260,10 +260,9 @@ package body GFX.Rasteriser.Primitives is
    --  Range of columns of the rendering area.
 
    function Can_Prepare_Simple_Row
-     (Chain       : Vertex_Array;
-      Cursor      : Row_Cursor;
-      Row_Lower   : Fixed_16;
-      Row_Upper   : Fixed_16) return Boolean;
+     (Cursor    : Row_Cursor;
+      Row_Lower : Fixed_16;
+      Row_Upper : Fixed_16) return Boolean;
    --  Return True when the current segment crosses the complete row and no
    --  segment switch can occur in it.
 
@@ -273,7 +272,7 @@ package body GFX.Rasteriser.Primitives is
       Row_Upper : Fixed_16;
       Cursor    : in out Row_Cursor)
      with Pre => Row_Upper = Row_Lower + One
-       and Can_Prepare_Simple_Row (Chain, Cursor, Row_Lower, Row_Upper);
+       and Can_Prepare_Simple_Row (Cursor, Row_Lower, Row_Upper);
    --  Advance Cursor to the next row, when the current segment crosses the
    --  complete row.
 
@@ -536,15 +535,14 @@ package body GFX.Rasteriser.Primitives is
    ----------------------------
 
    function Can_Prepare_Simple_Row
-     (Chain       : Vertex_Array;
-      Cursor      : Row_Cursor;
-      Row_Lower   : Fixed_16;
-      Row_Upper   : Fixed_16) return Boolean
+     (Cursor    : Row_Cursor;
+      Row_Lower : Fixed_16;
+      Row_Upper : Fixed_16) return Boolean
    is
    begin
       return Cursor.Segment /= 0
         and then Cursor.Y = Row_Lower
-        and then Row_Upper < Chain (Cursor.Segment + 1).Y;
+        and then Row_Upper < Cursor.Y_Bottom;
    end Can_Prepare_Simple_Row;
 
    ---------------------------
@@ -560,15 +558,12 @@ package body GFX.Rasteriser.Primitives is
       pragma Unreferenced (Row_Lower);
       --  Used by precondition only.
 
-      Index : constant Positive := Cursor.Segment;
-      Last  : Vertex renames Chain (Index + 1);
-
    begin
       Cursor.X := Cursor.At_Row_Upper;
       Cursor.Y := Row_Upper;
 
-      if Row_Upper + One < Last.Y then
-         Step (Cursor.At_Row_Upper, Chain (Index).Row_Slope);
+      if Row_Upper + One < Cursor.Y_Bottom then
+         Step (Cursor.At_Row_Upper, Chain (Cursor.Segment).Row_Slope);
       end if;
    end Advance_Simple_Cursor;
 
@@ -629,23 +624,25 @@ package body GFX.Rasteriser.Primitives is
          declare
             Index    : constant Positive   := Cursor.Segment;
             Last     : Vertex renames Chain (Index + 1);
+            Y_Last   : constant Fixed_16   := Cursor.Y_Bottom;
             X_Top    : constant Coordinate := Cursor.X;
             Y_Top    : constant Fixed_16   := Cursor.Y;
             X_Bottom : Coordinate;
             Y_Bottom : Fixed_16;
 
          begin
+            pragma Assert (Y_Last = Last.Y);
             pragma Assert (Row_Lower <= Cursor.Y);
-            pragma Assert (Cursor.Y < Last.Y);
+            pragma Assert (Cursor.Y < Y_Last);
 
             if Cursor.Y < Row_Upper then
-               if Row_Upper < Last.Y then
+               if Row_Upper < Y_Last then
                   X_Bottom := Cursor.At_Row_Upper;
                   Y_Bottom := Row_Upper;
 
                else
                   X_Bottom := To_Coordinate (Last.X);
-                  Y_Bottom := Last.Y;
+                  Y_Bottom := Y_Last;
                end if;
 
                Count := Count + 1;
@@ -659,11 +656,11 @@ package body GFX.Rasteriser.Primitives is
                   Cursor,
                   Portions (Count));
 
-               if Row_Upper < Last.Y then
+               if Row_Upper < Y_Last then
                   Cursor.X := X_Bottom;
                   Cursor.Y := Row_Upper;
 
-                  if Row_Upper + One < Last.Y then
+                  if Row_Upper + One < Y_Last then
                      --  Continue this segment by one DDA step.
 
                      Step (Cursor.At_Row_Upper, Chain (Index).Row_Slope);
@@ -675,7 +672,7 @@ package body GFX.Rasteriser.Primitives is
 
             if Row_Upper <= Cursor.Y then
                --  A newly selected segment starts in the next row.
-               if Row_Upper + One < Last.Y then
+               if Row_Upper + One < Y_Last then
                   Prepare_Intersection (Row_Upper + One);
                end if;
 
@@ -689,11 +686,11 @@ package body GFX.Rasteriser.Primitives is
                Cursor.Segment    := Index + 1;
                Cursor.Has_Column := False;
                Cursor.X := To_Coordinate (Last.X);
-               Cursor.Y := Last.Y;
+               Cursor.Y := Y_Last;
                Cursor.Y_Bottom := Chain (Index + 2).Y;
 
                if Cursor.Y < Row_Upper
-                 and then Row_Upper < Chain (Index + 2).Y
+                 and then Row_Upper < Cursor.Y_Bottom
                then
                   Prepare_Intersection (Row_Upper);
                end if;
@@ -944,10 +941,8 @@ package body GFX.Rasteriser.Primitives is
       while Left_Cursor.Segment /= 0 and Right_Cursor.Segment /= 0 loop
          Accumulator := Zero;
 
-         if Can_Prepare_Simple_Row
-              (Left, Left_Cursor, Row_Lower, Row_Upper)
-           and Can_Prepare_Simple_Row
-             (Right, Right_Cursor, Row_Lower, Row_Upper)
+         if Can_Prepare_Simple_Row (Left_Cursor, Row_Lower, Row_Upper)
+           and Can_Prepare_Simple_Row (Right_Cursor, Row_Lower, Row_Upper)
          then
             Draw_Simple_Row;
          else
