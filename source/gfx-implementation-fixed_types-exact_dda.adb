@@ -6,12 +6,13 @@
 
 pragma Restrictions (No_Elaboration_Code);
 
+with GFX.Implementation.Subpixel_Operations;
+
 package body GFX.Implementation.Fixed_Types.Exact_DDA is
 
-   Subpixel_Scale : constant := 2 ** 10;
-   --  Scale of 1/64 subpixel units in Fixed_16 units.
+   use GFX.Implementation.Subpixel_Operations;
 
-   Pixel_Scale    : constant := 2 ** 16;
+   Pixel_Scale : constant := 2 ** 16;
    --  Scale of pixel in Fixed_16 units.
 
    Small_Delta : constant := 2 ** 15;
@@ -32,11 +33,6 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
    --  Divide Factor * Delta_Out + Correction by Denominator rounding toward
    --  negative infinity, so Remainder is in 0 .. Denominator - 1. Quotient
    --  saturates on overflow, Remainder is zero in this case.
-
-   function Subpixels (Item : Fixed_16) return GX_Integer is
-     (GX_Integer (Item) / Subpixel_Scale)
-     with Inline;
-   --  Convert Item on the 1/64 subpixel grid to subpixel units.
 
    ---------------
    -- At_Offset --
@@ -161,10 +157,10 @@ package body GFX.Implementation.Fixed_Types.Exact_DDA is
       Lift : GX_Integer;
 
    begin
-      Self.Delta_Out   := Subpixels (Delta_Out);
-      Self.Denominator := Subpixels (Delta_In);
+      Self.Delta_Out   := To_Subpixel (Delta_Out);
+      Self.Denominator := To_Subpixel (Delta_In);
 
-      if Self.Denominator >= Pixel_Scale / Subpixel_Scale then
+      if Self.Denominator >= To_Subpixel (One) then
          --  Step is used only when Delta_In is at least one pixel.
 
          Divide

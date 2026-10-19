@@ -15,6 +15,10 @@ package GFX.Implementation.Subpixel_Operations
   with Pure
 is
 
+   subtype Subpixel_Index is GFX.GX_Integer;
+   --  Index of the 1/64 pixel cell. Subpixel N contains coordinates in
+   --  [N / 64, (N + 1) / 64).
+
    function Pixel_Upper_Bound
      (Item : GFX.Rasteriser.Device_Pixel_Index)
       return GFX.Implementation.Fixed_Types.Fixed_16
@@ -29,6 +33,15 @@ is
    --  rounding toward negative infinity. Pixel N contains coordinates in
    --  [N, N + 1); for example, -0.25 belongs to pixel -1.
 
+   function To_Subpixel
+     (Item : GFX.Implementation.Fixed_Types.Fixed_16)
+      return Subpixel_Index with Inline;
+   --  Return the index of the subpixel containing the given coordinate,
+   --  rounding toward negative infinity; for example, -0.25 belongs to
+   --  subpixel -16 and -1/128 belongs to subpixel -1. For a coordinate on
+   --  the 1/64 grid, and for a difference of such coordinates, the result
+   --  is exact: it is the value in 1/64 units.
+
 private
 
    use GFX.Implementation.Fixed_Types;
@@ -36,5 +49,9 @@ private
    function To_Pixel
      (Item : GFX.Implementation.Fixed_Types.Fixed_16)
       return GFX.Rasteriser.Device_Pixel_Index is (Floor (Item));
+
+   function To_Subpixel
+     (Item : GFX.Implementation.Fixed_Types.Fixed_16)
+      return Subpixel_Index is (Floor_6 (Item));
 
 end GFX.Implementation.Subpixel_Operations;

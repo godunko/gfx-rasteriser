@@ -212,6 +212,12 @@ is
    --  toward negative infinity. For example, 1.25 yields 1 and -1.25 yields
    --  -2; integral values are unchanged.
 
+   function Floor_6 (Item : Fixed_16) return GX_Integer with Inline;
+   --  Return `Item` in 1/64 units: the greatest integer N such that N / 64
+   --  is less than or equal to `Item`, rounding toward negative infinity.
+   --  For example, 1.25 yields 80, -1.25 yields -80 and -1/128 yields -1;
+   --  values on the 1/64 grid are converted exactly.
+
    function Max (Left : Fixed_16; Right : Fixed_16) return Fixed_16;
    --  Return the larger of Left and Right.
 
@@ -373,6 +379,9 @@ private
 
    function Floor (Item : Fixed_16) return GX_Integer is
      (As_GX_Integer (Shift_Right_Arithmetic (As_GX_Unsigned (Item), 16)));
+
+   function Floor_6 (Item : Fixed_16) return GX_Integer is
+     (As_GX_Integer (Shift_Right_Arithmetic (As_GX_Unsigned (Item), 10)));
 
    function Max (Left : Fixed_16; Right : Fixed_16) return Fixed_16 is
      (Fixed_16 (GX_Integer'Max (GX_Integer (Left), GX_Integer (Right))));
