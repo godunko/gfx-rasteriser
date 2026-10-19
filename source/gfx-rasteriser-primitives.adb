@@ -30,8 +30,6 @@ package body GFX.Rasteriser.Primitives is
    type Vertex is record
       X            : Fixed_16;
       Y            : Fixed_16;
-      Column       : GX_Integer;
-      Row          : GX_Integer;
       Row_Slope    : Slope;
       --  Inverse slope of the segment to the next vertex, ΔX / ΔY: change
       --  of X when Y changes, used to compute intersections with row
@@ -950,12 +948,7 @@ package body GFX.Rasteriser.Primitives is
          X : constant Fixed_16 := Snap_To_Subpixel (Point.X);
          Y : constant Fixed_16 := Snap_To_Subpixel (Point.Y);
          pragma Warnings (Off);
-         Item : constant Vertex :=
-           (X      => X,
-            Y      => Y,
-            Column => To_Pixel (X),
-            Row    => To_Pixel (Y),
-            others => <>);
+         Item : constant Vertex := (X => X, Y => Y, others => <>);
          pragma Warnings (On);
 
       begin
@@ -977,12 +970,7 @@ package body GFX.Rasteriser.Primitives is
          Y : constant Fixed_16 := Snap_To_Subpixel (Point.Y);
 
          pragma Warnings (Off);
-         Item : constant Vertex :=
-           (X      => Snap_To_Subpixel (Point.X),
-            Y      => Snap_To_Subpixel (Point.Y),
-            Column => To_Pixel (X),
-            Row    => To_Pixel (Y),
-            others => <>);
+         Item : constant Vertex := (X => X, Y => Y, others => <>);
          pragma Warnings (On);
 
       begin
@@ -1016,7 +1004,6 @@ package body GFX.Rasteriser.Primitives is
                  and then Chain (First).X = Chain (First + 1).X
                  and then Y_Top <= Chain (First + 1).Y);
             Chain (First).Y := Y_Top;
-            Chain (First).Row := To_Pixel (Y_Top);
          end if;
 
          if Y_Bottom < Chain (Last).Y then
@@ -1025,7 +1012,6 @@ package body GFX.Rasteriser.Primitives is
                  and then Chain (Last).X = Chain (Last - 1).X
                  and then Chain (Last - 1).Y <= Y_Bottom);
             Chain (Last).Y := Y_Bottom;
-            Chain (Last).Row := To_Pixel (Y_Bottom);
          end if;
 
          --  Snapping can make either end of either chain horizontal,
@@ -1063,10 +1049,8 @@ package body GFX.Rasteriser.Primitives is
 
          procedure Set (Item : out Vertex; X : Fixed_16; Y : Fixed_16) is
          begin
-            Item.X      := X;
-            Item.Y      := Y;
-            Item.Column := To_Pixel (X);
-            Item.Row    := To_Pixel (Y);
+            Item.X := X;
+            Item.Y := Y;
          end Set;
 
       begin
@@ -1106,14 +1090,10 @@ package body GFX.Rasteriser.Primitives is
          Right.Column_Slope     := Top.Column_Slope;
          Right_Top.X            := Top.X;
          Right_Top.Y            := Top.Y;
-         Right_Top.Column       := Top.Column;
-         Right_Top.Row          := Top.Row;
          Right_Top.Row_Slope    := Left.Row_Slope;
          Right_Top.Column_Slope := Left.Column_Slope;
          Right_Bottom.X         := Left_Bottom.X;
          Right_Bottom.Y         := Left_Bottom.Y;
-         Right_Bottom.Column    := Left_Bottom.Column;
-         Right_Bottom.Row       := Left_Bottom.Row;
 
          --  Horizontal sides are excluded from chains. When side Top-Left
          --  is horizontal, Right-Bottom is horizontal too, and so on.
