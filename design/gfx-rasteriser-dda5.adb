@@ -256,12 +256,9 @@ package body GFX.Rasteriser.DDA5 is
       ----------------
 
       procedure Fill_Solid (First : GX_Integer; Last : GX_Integer) is
-         Acc   : Fixed_6 := Accumulator;
-         Value : Grayscale;
+         Value : constant Grayscale := Coverage.Solid_Alpha (Accumulator);
 
       begin
-         Integrate (Acc, (Zero, Zero), Value);
-
          if Value /= 0 then
             Fill_Span
               (First, Row, Device_Pixel_Count (Last - First + 1), Value);

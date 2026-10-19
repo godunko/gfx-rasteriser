@@ -669,12 +669,9 @@ package body GFX.Rasteriser.Primitives is
         (Column : GX_Integer;
          Width  : Device_Pixel_Count)
       is
-         Acc   : Fixed_6 := Accumulator;
-         Value : Grayscale;
+         Value : constant Grayscale := Solid_Alpha (Accumulator);
 
       begin
-         Integrate (Acc, (Zero, Zero), Value);
-
          if Value /= 0 then
             Fill_Span (Column, Row, Width, Value);
          end if;

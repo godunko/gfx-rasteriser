@@ -42,4 +42,10 @@ is
    --  the left of the cell and contribution of edges inside of it, and add
    --  this contribution to Accumulator.
 
+   function Solid_Alpha
+     (Accumulator : GFX.Implementation.Fixed_Types.Fixed_6) return Grayscale
+     with Inline_Always;
+   --  Compute coverage of the cell not crossed by any edge from the
+   --  accumulated height of edges to the left of the cell.
+
 end GFX.Rasteriser.Coverage;

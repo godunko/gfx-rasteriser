@@ -41,4 +41,13 @@ package body GFX.Rasteriser.Coverage is
       Accumulator := @ + Item.Coverage;
    end Integrate;
 
+   -----------------
+   -- Solid_Alpha --
+   -----------------
+
+   function Solid_Alpha (Accumulator : Fixed_6) return Grayscale is
+   begin
+      return Grayscale (Integral (255 * abs (Accumulator * One)));
+   end Solid_Alpha;
+
 end GFX.Rasteriser.Coverage;
