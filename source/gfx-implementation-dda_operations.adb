@@ -6,8 +6,6 @@
 
 pragma Restrictions (No_Elaboration_Code);
 
-with GFX.Implementation.Subpixel_Operations;
-
 package body GFX.Implementation.DDA_Operations is
 
    use GFX.Implementation.Fixed_Types;

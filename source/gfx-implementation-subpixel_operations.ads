@@ -42,6 +42,14 @@ is
    --  the 1/64 grid, and for a difference of such coordinates, the result
    --  is exact: it is the value in 1/64 units.
 
+   package Ghost with Ghost is
+
+      function Is_On_Subpixel_Grid
+        (Item : GFX.Implementation.Fixed_Types.Fixed_16) return Boolean;
+      --  Check that given value is a multiple of 1/64 pixel.
+
+   end Ghost;
+
 private
 
    use GFX.Implementation.Fixed_Types;

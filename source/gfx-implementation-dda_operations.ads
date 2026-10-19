@@ -19,6 +19,7 @@
 pragma Restrictions (No_Elaboration_Code);
 
 with GFX.Implementation.Fixed_Types;
+with GFX.Implementation.Subpixel_Operations;
 
 package GFX.Implementation.DDA_Operations
   with Pure
@@ -39,10 +40,18 @@ is
      (Self      : out Slope;
       Delta_Out : GFX.Implementation.Fixed_Types.Fixed_16;
       Delta_In  : GFX.Implementation.Fixed_Types.Fixed_16)
-     with Pre => Delta_In >= GFX.Implementation.Fixed_Types.Zero;
-   --  Both deltas must be on the 1/64 subpixel grid. When Delta_In is zero
-   --  the slope can't be used to compute coordinates; when it is less than
-   --  one pixel, Step and Step_Back can't be used.
+   with
+     Pre =>
+       Delta_In >= GFX.Implementation.Fixed_Types.Zero
+       and
+         GFX.Implementation.Subpixel_Operations.Ghost.Is_On_Subpixel_Grid
+           (Delta_Out)
+       and
+         GFX.Implementation.Subpixel_Operations.Ghost.Is_On_Subpixel_Grid
+           (Delta_In);
+   --  Both deltas must be on the 1/64 subpixel grid, so the slope is exact.
+   --  When Delta_In is zero the slope can't be used to compute coordinates;
+   --  when it is less than one pixel, Step and Step_Back can't be used.
 
    function To_Coordinate (Value : GFX.Implementation.Fixed_Types.Fixed_16) return Coordinate
      with Inline;
