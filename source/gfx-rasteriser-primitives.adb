@@ -42,6 +42,9 @@ package body GFX.Rasteriser.Primitives is
 
    type Vertex_Array is array (Positive range <>) of Vertex;
 
+   subtype Chain_Storage is Vertex_Array (1 .. 4);
+   --  Storage of the chain of vertices of the line's contour.
+
    type Row_Cursor is record
       Segment      : Natural := 0;
       --  Zero means that the chain is exhausted.
@@ -89,7 +92,11 @@ package body GFX.Rasteriser.Primitives is
          Y        : Device_Pixel_Index;
          Width    : Device_Pixel_Count;
          Coverage : Grayscale))
-     with Pre =>
+     with
+       No_Inline,
+       --  Inlining into the only caller increases register pressure in the
+       --  row loop; it was measured to be slower on MCUs.
+       Pre =>
        Left'Length in 2 .. 4 and Right'Length in 2 .. 4
        --  Both vertex lists contain at least one edge.
        and Ghost.Has_Strictly_Increasing_Y (Left)
@@ -104,6 +111,24 @@ package body GFX.Rasteriser.Primitives is
    procedure Initialize_Slopes (Item : in out Vertex; Next : Vertex)
      with Pre => Item.Y <= Next.Y;
    --  Compute slopes of the segment from Item to Next.
+
+   function Build_Contour
+     (Point_A      : GFX.Points.GF_Point;
+      Point_B      : GFX.Points.GF_Point;
+      Width        : GFX.GX_Real;
+      Left_Vertex  : out Chain_Storage;
+      Left_First   : out Positive;
+      Left_Last    : out Natural;
+      Right_Vertex : out Chain_Storage;
+      Right_First  : out Positive;
+      Right_Last   : out Natural) return Boolean
+     with Inline;
+   --  Build the closed contour of the line of the given width between two
+   --  points, clipped by the rendering area: its left and right chains of
+   --  vertices from top to bottom with initialized slopes. Return False when
+   --  nothing is visible; otherwise, Left_Vertex (Left_First .. Left_Last)
+   --  and Right_Vertex (Right_First .. Right_Last) satisfy the precondition
+   --  of Rasterize_Contour.
 
    procedure Initialize_Row_Cursor
      (Chain     : Vertex_Array;
@@ -885,19 +910,20 @@ package body GFX.Rasteriser.Primitives is
       end loop;
    end Rasterize_Contour;
 
-   --------------------
-   -- Rasterize_Line --
-   --------------------
+   -------------------
+   -- Build_Contour --
+   -------------------
 
-   procedure Rasterize_Line
-     (Point_A   : GFX.Points.GF_Point;
-      Point_B   : GFX.Points.GF_Point;
-      Width     : GFX.GX_Real;
-      Fill_Span : not null access procedure
-        (X        : GFX.Rasteriser.Device_Pixel_Index;
-         Y        : GFX.Rasteriser.Device_Pixel_Index;
-         Width    : GFX.Rasteriser.Device_Pixel_Count;
-         Coverage : GFX.Rasteriser.Grayscale))
+   function Build_Contour
+     (Point_A      : GFX.Points.GF_Point;
+      Point_B      : GFX.Points.GF_Point;
+      Width        : GFX.GX_Real;
+      Left_Vertex  : out Chain_Storage;
+      Left_First   : out Positive;
+      Left_Last    : out Natural;
+      Right_Vertex : out Chain_Storage;
+      Right_First  : out Positive;
+      Right_Last   : out Natural) return Boolean
    is
       use GFX.Implementation.Clipping;
       use type GFX.Points.GF_Point;
@@ -914,13 +940,7 @@ package body GFX.Rasteriser.Primitives is
       Outcode_Bottom : GFX.Implementation.Clipping.Outcode;
       Outcode_Left   : GFX.Implementation.Clipping.Outcode;
 
-      Left_Vertex  : Vertex_Array (1 .. 4);
-      Left_First   : Positive := 1;
-      Left_Last    : Natural := 0;
-      Right_Vertex : Vertex_Array (1 .. 4);
-      Right_First  : Positive := 1;
-      Right_Last   : Natural := 0;
-      Done         : Boolean := False;
+      Done : Boolean := False;
 
       procedure Append_Left_Vertex (Point : GFX.Points.GF_Point);
 
@@ -933,12 +953,13 @@ package body GFX.Rasteriser.Primitives is
          Y_Top    : Fixed_16;
          Y_Bottom : Fixed_16);
 
-      procedure Rasterize_Parallelogram;
-      --  Rasterize the rectangle inside of the rendering area. Its bottom
-      --  vertex is computed from the other ones, so the contour is an exact
-      --  parallelogram on the subpixel grid and its opposite sides share
-      --  slopes. Set Done unless the bottom vertex is outside of the
-      --  rendering area due to rounding.
+      procedure Build_Parallelogram;
+      --  Build chains of the rectangle inside of the rendering area. Its
+      --  bottom vertex is computed from the other ones, so the contour is an
+      --  exact parallelogram on the subpixel grid and its opposite sides
+      --  share slopes. Set Done unless the bottom vertex is outside of the
+      --  rendering area due to rounding. Chains are left empty when the
+      --  rectangle is degenerated after snapping.
 
       ------------------------
       -- Append_Left_Vertex --
@@ -1028,11 +1049,11 @@ package body GFX.Rasteriser.Primitives is
          end loop;
       end Adjust_Y;
 
-      -----------------------------
-      -- Rasterize_Parallelogram --
-      -----------------------------
+      -------------------------
+      -- Build_Parallelogram --
+      -------------------------
 
-      procedure Rasterize_Parallelogram is
+      procedure Build_Parallelogram is
          Top          : Vertex renames Left_Vertex (1);
          Left         : Vertex renames Left_Vertex (2);
          Left_Bottom  : Vertex renames Left_Vertex (3);
@@ -1098,22 +1119,23 @@ package body GFX.Rasteriser.Primitives is
          --  Horizontal sides are excluded from chains. When side Top-Left
          --  is horizontal, Right-Bottom is horizontal too, and so on.
 
-         Rasterize_Contour
-           (Left_Vertex
-              ((if Left.Y = Top.Y then 2 else 1)
-               .. (if Right.Y = Top.Y then 2 else 3)),
-            Right_Vertex
-              ((if Right.Y = Top.Y then 2 else 1)
-               .. (if Left.Y = Top.Y then 2 else 3)),
-            Fill_Span);
-      end Rasterize_Parallelogram;
+         Left_First  := (if Left.Y = Top.Y then 2 else 1);
+         Left_Last   := (if Right.Y = Top.Y then 2 else 3);
+         Right_First := (if Right.Y = Top.Y then 2 else 1);
+         Right_Last  := (if Left.Y = Top.Y then 2 else 3);
+      end Build_Parallelogram;
 
    begin
+      Left_First  := 1;
+      Left_Last   := 0;
+      Right_First := 1;
+      Right_Last  := 0;
+
       if Width <= 0.0 or else Point_A = Point_B
         or else X_Min (Rendering_Area) = X_Max (Rendering_Area)
         or else Y_Min (Rendering_Area) = Y_Max (Rendering_Area)
       then
-         return;
+         return False;
       end if;
 
       --  1. Compute rectangle to be drawn.
@@ -1162,10 +1184,10 @@ package body GFX.Rasteriser.Primitives is
            and Y_Min (Rendering_Area) <= Vertex_Top.Y
            and Vertex_Bottom.Y <= Y_Max (Rendering_Area)
          then
-            Rasterize_Parallelogram;
+            Build_Parallelogram;
 
             if Done then
-               return;
+               return Left_Last /= 0;
             end if;
          end if;
 
@@ -1185,7 +1207,7 @@ package body GFX.Rasteriser.Primitives is
             --  Clipping also do checks like this, may be they can be
             --  merged with some assumptions?
 
-            return;
+            return False;
          end if;
       end;
 
@@ -1203,7 +1225,7 @@ package body GFX.Rasteriser.Primitives is
       then
          --  Rectangle is completely outside of the rendering area.
 
-         return;
+         return False;
       end if;
 
       if Outcode_Top /= GFX.Implementation.Clipping.Inside
@@ -1250,7 +1272,7 @@ package body GFX.Rasteriser.Primitives is
                   --  window. The rectangle interior extends in those
                   --  directions, so no part of the rectangle is visible.
 
-                  return;
+                  return False;
                end if;
             end if;
 
@@ -1286,7 +1308,7 @@ package body GFX.Rasteriser.Primitives is
                   --  Left -> Bottom was rejected to the right or above
                   --  the window, excluding the entire rectangle.
 
-                  return;
+                  return False;
 
                else
                   if Left_Last = 0 then
@@ -1337,7 +1359,7 @@ package body GFX.Rasteriser.Primitives is
                   --  window. The rectangle interior extends in those
                   --  directions, so no part of the rectangle is visible.
 
-                  return;
+                  return False;
                end if;
             end if;
 
@@ -1373,7 +1395,7 @@ package body GFX.Rasteriser.Primitives is
                   --  Right -> Bottom was rejected to the left or above
                   --  the window, excluding the entire rectangle.
 
-                  return;
+                  return False;
 
                else
                   if Right_Last = 0 then
@@ -1399,7 +1421,7 @@ package body GFX.Rasteriser.Primitives is
       --  3. Restrict both chains to their common Y range.
 
       if Left_Last = 0 or else Right_Last = 0 then
-         return;
+         return False;
       end if;
 
       declare
@@ -1410,7 +1432,7 @@ package body GFX.Rasteriser.Primitives is
 
       begin
          if Y_Bottom <= Y_Top then
-            return;
+            return False;
          end if;
 
          Adjust_Y (Left_Vertex, Left_First, Left_Last, Y_Top, Y_Bottom);
@@ -1427,14 +1449,47 @@ package body GFX.Rasteriser.Primitives is
          Initialize_Slopes (Right_Vertex (J), Right_Vertex (J + 1));
       end loop;
 
-      --  5. Rasterize the closed contour between the two clipped chains.
+      return True;
+   end Build_Contour;
 
-      Rasterize_Contour
-        (Left_Vertex (Left_First .. Left_Last),
-         Right_Vertex (Right_First .. Right_Last),
-         --  Left_First, Right_First,
-         --  Left_Last, Right_Last,
-         Fill_Span);
+   --------------------
+   -- Rasterize_Line --
+   --------------------
+
+   procedure Rasterize_Line
+     (Point_A   : GFX.Points.GF_Point;
+      Point_B   : GFX.Points.GF_Point;
+      Width     : GFX.GX_Real;
+      Fill_Span : not null access procedure
+        (X        : GFX.Rasteriser.Device_Pixel_Index;
+         Y        : GFX.Rasteriser.Device_Pixel_Index;
+         Width    : GFX.Rasteriser.Device_Pixel_Count;
+         Coverage : GFX.Rasteriser.Grayscale))
+   is
+      Left_Vertex  : Chain_Storage;
+      Left_First   : Positive;
+      Left_Last    : Natural;
+      Right_Vertex : Chain_Storage;
+      Right_First  : Positive;
+      Right_Last   : Natural;
+
+   begin
+      if Build_Contour
+           (Point_A,
+            Point_B,
+            Width,
+            Left_Vertex,
+            Left_First,
+            Left_Last,
+            Right_Vertex,
+            Right_First,
+            Right_Last)
+      then
+         Rasterize_Contour
+           (Left_Vertex (Left_First .. Left_Last),
+            Right_Vertex (Right_First .. Right_Last),
+            Fill_Span);
+      end if;
    end Rasterize_Line;
 
    ----------------------
